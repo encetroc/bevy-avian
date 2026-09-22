@@ -4,14 +4,14 @@
 
 **Blocked by:** 13
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] Each control is available from the station UI.
-- [ ] Persistent effects differ observably from one-shot effects.
+- [x] Each control is available from the station UI.
+- [x] Persistent effects differ observably from one-shot effects.
 
 ## Tests
 
-- [ ] Apply each control to identical objects.
-- [ ] Verify torque controls change angular motion rather than translation.
+- [x] Apply each control to identical objects.
+- [x] Verify torque controls change angular motion rather than translation.

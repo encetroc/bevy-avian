@@ -4,14 +4,14 @@
 
 **Blocked by:** 09
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] Selecting an object opens its inspector.
-- [ ] Changing selection updates the displayed object and deselection clears it.
+- [x] Selecting an object opens its inspector.
+- [x] Changing selection updates the displayed object and deselection clears it.
 
 ## Tests
 
-- [ ] Select several body types and compare the inspector.
-- [ ] Click empty space and verify the inspector clears.
+- [x] Select several body types and compare the inspector.
+- [x] Click empty space and verify the inspector clears.

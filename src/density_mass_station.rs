@@ -336,6 +336,7 @@ fn queue_density_mass_station_actions(
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn apply_density_mass_station_actions(
     mut actions: MessageReader<DensityMassLabAction>,
     mut commands: Commands,
@@ -449,6 +450,7 @@ fn effective_mass(computed_mass: Option<&ComputedMass>, explicit_mass: Option<&M
         .unwrap_or(1.0)
 }
 
+#[allow(clippy::type_complexity)]
 fn apply_density_mass_player_push(
     settings: Option<Res<PlayerMovementSettings>>,
     time: Res<Time>,
@@ -491,6 +493,7 @@ fn apply_density_mass_player_push(
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn draw_density_mass_labels(
     mut gizmos: Gizmos,
     objects: Query<(

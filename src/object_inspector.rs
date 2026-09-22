@@ -1,7 +1,7 @@
 use avian3d::{parry::shape::TypedShape, prelude::*};
 use bevy::prelude::*;
 
-use crate::cursor_hover::{HoverState, update_hover_reachability};
+use crate::cursor_hover::{CursorRay, HoverState, update_hover_reachability};
 
 const PANEL_BACKGROUND: Color = Color::srgba(0.035, 0.05, 0.08, 0.94);
 const PANEL_TEXT: Color = Color::srgb(0.87, 0.92, 0.98);
@@ -11,8 +11,63 @@ const CONTROL_PRESSED: Color = Color::srgb(0.2, 0.38, 0.55);
 /// The physics body currently selected by the development inspector.
 #[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SelectionState {
-    /// The selected entity, or `None` when the last click hit empty space.
+    /// The selected body or joint entity, or `None` when the last click hit empty space.
     pub entity: Option<Entity>,
+}
+
+/// A readable snapshot of the selected joint's configuration and stress state.
+#[derive(Clone, Debug, PartialEq)]
+pub struct JointInspectorSnapshot {
+    pub entity: Entity,
+    pub name: String,
+    pub joint_type: JointType,
+    pub body1: Entity,
+    pub body2: Entity,
+    pub body1_name: String,
+    pub body2_name: String,
+    pub anchor1: Option<Vec3>,
+    pub anchor2: Option<Vec3>,
+    pub compliance: JointComplianceInfo,
+    pub damping: JointDampingInfo,
+    pub stress: Option<JointStressInfo>,
+    pub enabled: bool,
+}
+
+/// The Avian joint type represented by an inspected joint.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum JointType {
+    Fixed,
+    Distance,
+    Revolute,
+    Prismatic,
+    Spherical,
+}
+
+/// Compliance values exposed by a joint inspector.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct JointComplianceInfo {
+    pub point: Option<f32>,
+    pub alignment: Option<f32>,
+    pub angle: Option<f32>,
+    pub limit: Option<f32>,
+    pub swing: Option<f32>,
+    pub twist: Option<f32>,
+}
+
+/// Damping values exposed by a joint inspector.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct JointDampingInfo {
+    pub linear: f32,
+    pub angular: f32,
+    pub present: bool,
+}
+
+/// Force, torque, and motor stress reported by Avian for an inspected joint.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct JointStressInfo {
+    pub force: Vec3,
+    pub torque: Vec3,
+    pub motor_force: f32,
 }
 
 /// A readable snapshot of the selected body's physics and current simulation state.
@@ -56,6 +111,7 @@ pub struct FrictionInfo {
 #[derive(Resource, Clone, Debug, Default, PartialEq)]
 pub struct InspectorState {
     pub object: Option<InspectorSnapshot>,
+    pub joint: Option<JointInspectorSnapshot>,
 }
 
 /// Owns click selection and the development-only selected-object inspector.
@@ -70,7 +126,9 @@ impl Plugin for ObjectInspectorPlugin {
                 Update,
                 (
                     select_hovered_object.after(update_hover_reachability),
+                    select_hovered_joint,
                     apply_inspector_edits,
+                    apply_joint_inspector_edits,
                     refresh_inspector,
                     update_inspector_ui,
                 )
@@ -98,6 +156,123 @@ fn select_hovered_object(
     selection.set_if_neq(SelectionState {
         entity: hover.object.as_ref().map(|object| object.entity),
     });
+}
+
+/// Selects the joint whose visible anchor line is under the cursor. Joints do
+/// not have colliders, so selection uses the same cursor ray as body hover and
+/// a small world-space distance threshold around each joint's anchors.
+fn select_hovered_joint(
+    mouse: Res<ButtonInput<MouseButton>>,
+    cursor_ray: Res<CursorRay>,
+    controls: Query<&Interaction, With<InspectorControl>>,
+    mut selection: ResMut<SelectionState>,
+    joints: Query<(
+        Entity,
+        Option<&FixedJoint>,
+        Option<&DistanceJoint>,
+        Option<&RevoluteJoint>,
+        Option<&PrismaticJoint>,
+        Option<&SphericalJoint>,
+    )>,
+    bodies: Query<&Transform>,
+) {
+    if !mouse.just_pressed(MouseButton::Left)
+        || controls
+            .iter()
+            .any(|interaction| *interaction == Interaction::Pressed)
+    {
+        return;
+    }
+
+    let Some(ray) = cursor_ray.ray else {
+        return;
+    };
+    let Some((joint, _)) = closest_joint_to_ray(ray, &joints, &bodies) else {
+        return;
+    };
+    selection.set_if_neq(SelectionState {
+        entity: Some(joint),
+    });
+}
+
+const JOINT_PICK_DISTANCE: f32 = 0.3;
+
+fn closest_joint_to_ray(
+    ray: Ray3d,
+    joints: &Query<(
+        Entity,
+        Option<&FixedJoint>,
+        Option<&DistanceJoint>,
+        Option<&RevoluteJoint>,
+        Option<&PrismaticJoint>,
+        Option<&SphericalJoint>,
+    )>,
+    body_transforms: &Query<&Transform>,
+) -> Option<(Entity, f32)> {
+    let mut closest = None;
+    for (entity, fixed, distance, revolute, prismatic, spherical) in joints.iter() {
+        let Some((_, joint_bodies, anchors, _)) =
+            joint_details(fixed, distance, revolute, prismatic, spherical)
+        else {
+            continue;
+        };
+        let [body1, body2] = joint_bodies;
+        let [Some(local_anchor1), Some(local_anchor2)] = anchors else {
+            continue;
+        };
+        let Ok([transform1, transform2]) = body_transforms.get_many([body1, body2]) else {
+            continue;
+        };
+        let anchor1 = transform1.translation + transform1.rotation * local_anchor1;
+        let anchor2 = transform2.translation + transform2.rotation * local_anchor2;
+        let Some((ray_distance, segment_distance)) =
+            ray_segment_distance(ray.origin, ray.direction, anchor1, anchor2)
+        else {
+            continue;
+        };
+        if segment_distance > JOINT_PICK_DISTANCE
+            || closest.is_some_and(|(_, current)| ray_distance >= current)
+        {
+            continue;
+        }
+        closest = Some((entity, ray_distance));
+    }
+    closest
+}
+
+fn ray_segment_distance(
+    origin: Vec3,
+    direction: Dir3,
+    start: Vec3,
+    end: Vec3,
+) -> Option<(f32, f32)> {
+    let direction = direction.as_vec3();
+    let segment = end - start;
+    let segment_length_squared = segment.length_squared();
+    let (ray_distance, segment_factor) = if segment_length_squared <= f32::EPSILON {
+        ((start - origin).dot(direction), 0.0)
+    } else {
+        let ray_to_start = start - origin;
+        let direction_segment = direction.dot(segment);
+        let ray_segment = direction.dot(ray_to_start);
+        let segment_start = segment.dot(ray_to_start);
+        let denominator = segment_length_squared - direction_segment * direction_segment;
+        if denominator.abs() <= f32::EPSILON {
+            (ray_segment, 0.0)
+        } else {
+            let ray_distance = (segment_length_squared * ray_segment
+                - direction_segment * segment_start)
+                / denominator;
+            let segment_factor =
+                (segment_start - ray_distance * direction_segment) / segment_length_squared;
+            (ray_distance, segment_factor)
+        }
+    };
+    let segment_factor = segment_factor.clamp(0.0, 1.0);
+    let ray_distance = ray_distance.max(0.0);
+    let ray_point = origin + direction * ray_distance;
+    let segment_point = start + segment * segment_factor;
+    Some((ray_distance, ray_point.distance(segment_point)))
 }
 
 /// Applies one-shot button edits directly to the selected body's Avian
@@ -242,8 +417,201 @@ fn apply_inspector_edits(
                 };
                 commands.entity(entity).insert(next_body);
             }
+            _ => {}
         }
     }
+}
+
+#[allow(clippy::type_complexity)]
+fn apply_joint_inspector_edits(
+    mut selection: ResMut<SelectionState>,
+    mut commands: Commands,
+    controls: Query<(&Interaction, &InspectorControl), Changed<Interaction>>,
+    mut joints: Query<(
+        Option<&mut FixedJoint>,
+        Option<&mut DistanceJoint>,
+        Option<&mut RevoluteJoint>,
+        Option<&mut PrismaticJoint>,
+        Option<&mut SphericalJoint>,
+        Option<&mut JointDamping>,
+        Option<&JointDisabled>,
+    )>,
+) {
+    let Some(entity) = selection.entity else {
+        return;
+    };
+    let Ok((
+        mut fixed,
+        mut distance,
+        mut revolute,
+        mut prismatic,
+        mut spherical,
+        mut damping,
+        disabled,
+    )) = joints.get_mut(entity)
+    else {
+        return;
+    };
+    if fixed.is_none()
+        && distance.is_none()
+        && revolute.is_none()
+        && prismatic.is_none()
+        && spherical.is_none()
+    {
+        return;
+    }
+
+    for (interaction, control) in &controls {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        match *control {
+            InspectorControl::ToggleJointEnabled => {
+                if disabled.is_some() {
+                    commands.entity(entity).remove::<JointDisabled>();
+                } else {
+                    commands.entity(entity).insert(JointDisabled);
+                }
+            }
+            InspectorControl::DeleteJoint => {
+                commands.entity(entity).despawn();
+                selection.entity = None;
+                return;
+            }
+            InspectorControl::JointAnchor { body, axis, step } => {
+                let delta = 0.1 * step_multiplier(step);
+                if let Some(joint) = fixed.as_deref_mut() {
+                    let anchor = if body == JointBody::First {
+                        &mut joint.frame1.anchor
+                    } else {
+                        &mut joint.frame2.anchor
+                    };
+                    update_joint_anchor(anchor, axis, delta);
+                }
+                if let Some(joint) = distance.as_deref_mut() {
+                    let anchor = if body == JointBody::First {
+                        &mut joint.anchor1
+                    } else {
+                        &mut joint.anchor2
+                    };
+                    update_joint_anchor(anchor, axis, delta);
+                }
+                if let Some(joint) = revolute.as_deref_mut() {
+                    let anchor = if body == JointBody::First {
+                        &mut joint.frame1.anchor
+                    } else {
+                        &mut joint.frame2.anchor
+                    };
+                    update_joint_anchor(anchor, axis, delta);
+                }
+                if let Some(joint) = prismatic.as_deref_mut() {
+                    let anchor = if body == JointBody::First {
+                        &mut joint.frame1.anchor
+                    } else {
+                        &mut joint.frame2.anchor
+                    };
+                    update_joint_anchor(anchor, axis, delta);
+                }
+                if let Some(joint) = spherical.as_deref_mut() {
+                    let anchor = if body == JointBody::First {
+                        &mut joint.frame1.anchor
+                    } else {
+                        &mut joint.frame2.anchor
+                    };
+                    update_joint_anchor(anchor, axis, delta);
+                }
+            }
+            InspectorControl::JointCompliance { property, step } => {
+                let delta = 0.001 * step_multiplier(step);
+                if let Some(joint) = fixed.as_deref_mut() {
+                    match property {
+                        JointComplianceProperty::Point => {
+                            joint.point_compliance = (joint.point_compliance + delta).max(0.0)
+                        }
+                        JointComplianceProperty::Angle => {
+                            joint.angle_compliance = (joint.angle_compliance + delta).max(0.0)
+                        }
+                        _ => {}
+                    }
+                }
+                if let Some(joint) = distance.as_deref_mut()
+                    && property == JointComplianceProperty::Point
+                {
+                    joint.compliance = (joint.compliance + delta).max(0.0);
+                }
+                if let Some(joint) = revolute.as_deref_mut() {
+                    match property {
+                        JointComplianceProperty::Point => {
+                            joint.point_compliance = (joint.point_compliance + delta).max(0.0)
+                        }
+                        JointComplianceProperty::Alignment => {
+                            joint.align_compliance = (joint.align_compliance + delta).max(0.0)
+                        }
+                        JointComplianceProperty::Limit => {
+                            joint.limit_compliance = (joint.limit_compliance + delta).max(0.0)
+                        }
+                        _ => {}
+                    }
+                }
+                if let Some(joint) = prismatic.as_deref_mut() {
+                    match property {
+                        JointComplianceProperty::Alignment => {
+                            joint.align_compliance = (joint.align_compliance + delta).max(0.0)
+                        }
+                        JointComplianceProperty::Angle => {
+                            joint.angle_compliance = (joint.angle_compliance + delta).max(0.0)
+                        }
+                        JointComplianceProperty::Limit => {
+                            joint.limit_compliance = (joint.limit_compliance + delta).max(0.0)
+                        }
+                        _ => {}
+                    }
+                }
+                if let Some(joint) = spherical.as_deref_mut() {
+                    match property {
+                        JointComplianceProperty::Point => {
+                            joint.point_compliance = (joint.point_compliance + delta).max(0.0)
+                        }
+                        JointComplianceProperty::Swing => {
+                            joint.swing_compliance = (joint.swing_compliance + delta).max(0.0)
+                        }
+                        JointComplianceProperty::Twist => {
+                            joint.twist_compliance = (joint.twist_compliance + delta).max(0.0)
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            InspectorControl::JointDamping { kind, step } => {
+                let delta = 0.1 * step_multiplier(step);
+                if let Some(damping) = damping.as_deref_mut() {
+                    match kind {
+                        JointDampingKind::Linear => {
+                            damping.linear = (damping.linear + delta).max(0.0)
+                        }
+                        JointDampingKind::Angular => {
+                            damping.angular = (damping.angular + delta).max(0.0)
+                        }
+                    }
+                } else {
+                    let mut value = JointDamping::default();
+                    match kind {
+                        JointDampingKind::Linear => value.linear = delta.max(0.0),
+                        JointDampingKind::Angular => value.angular = delta.max(0.0),
+                    }
+                    commands.entity(entity).insert(value);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn update_joint_anchor(anchor: &mut JointAnchor, axis: Axis, delta: f32) {
+    let JointAnchor::Local(value) = anchor else {
+        return;
+    };
+    change_axis(value, axis, delta);
 }
 
 fn scalar_step(property: ScalarProperty) -> f32 {
@@ -299,6 +667,18 @@ fn refresh_inspector(
         Option<&Restitution>,
         Has<Sleeping>,
         Has<SleepingDisabled>,
+    )>,
+    joint_names: Query<&Name>,
+    joints: Query<(
+        Option<&Name>,
+        Option<&FixedJoint>,
+        Option<&DistanceJoint>,
+        Option<&RevoluteJoint>,
+        Option<&PrismaticJoint>,
+        Option<&SphericalJoint>,
+        Option<&JointDamping>,
+        Option<&JointForces>,
+        Has<JointDisabled>,
     )>,
 ) {
     let selected = selection.entity;
@@ -375,12 +755,131 @@ fn refresh_inspector(
         })
     });
 
-    if next_object.is_none() && selected.is_some() {
+    let next_joint = selected.and_then(|entity| {
+        let (name, fixed, distance, revolute, prismatic, spherical, damping, forces, disabled) =
+            joints.get(entity).ok()?;
+        let (joint_type, bodies, anchors, compliance) =
+            joint_details(fixed, distance, revolute, prismatic, spherical)?;
+        let [body1, body2] = bodies;
+        let stress = forces.map(|forces| JointStressInfo {
+            force: forces.force(),
+            torque: forces.torque(),
+            motor_force: forces.motor_force(),
+        });
+
+        Some(JointInspectorSnapshot {
+            entity,
+            name: name
+                .map(|name| name.as_str().to_owned())
+                .unwrap_or_else(|| format!("Physics Joint {entity:?}")),
+            joint_type,
+            body1,
+            body2,
+            body1_name: joint_entity_name(&joint_names, body1),
+            body2_name: joint_entity_name(&joint_names, body2),
+            anchor1: anchors[0],
+            anchor2: anchors[1],
+            compliance,
+            damping: damping.map_or(JointDampingInfo::default(), |damping| JointDampingInfo {
+                linear: damping.linear,
+                angular: damping.angular,
+                present: true,
+            }),
+            stress,
+            enabled: !disabled,
+        })
+    });
+
+    if next_object.is_none() && next_joint.is_none() && selected.is_some() {
         selection.entity = None;
     }
     inspector.set_if_neq(InspectorState {
         object: next_object,
+        joint: next_joint,
     });
+}
+
+fn joint_entity_name(names: &Query<&Name>, entity: Entity) -> String {
+    names
+        .get(entity)
+        .map(|name| name.as_str().to_owned())
+        .unwrap_or_else(|_| format!("Physics Entity {entity:?}"))
+}
+
+fn joint_details(
+    fixed: Option<&FixedJoint>,
+    distance: Option<&DistanceJoint>,
+    revolute: Option<&RevoluteJoint>,
+    prismatic: Option<&PrismaticJoint>,
+    spherical: Option<&SphericalJoint>,
+) -> Option<(
+    JointType,
+    [Entity; 2],
+    [Option<Vec3>; 2],
+    JointComplianceInfo,
+)> {
+    if let Some(joint) = fixed {
+        return Some((
+            JointType::Fixed,
+            [joint.body1, joint.body2],
+            [joint.local_anchor1(), joint.local_anchor2()],
+            JointComplianceInfo {
+                point: Some(joint.point_compliance),
+                angle: Some(joint.angle_compliance),
+                ..default()
+            },
+        ));
+    }
+    if let Some(joint) = distance {
+        return Some((
+            JointType::Distance,
+            [joint.body1, joint.body2],
+            [joint.local_anchor1(), joint.local_anchor2()],
+            JointComplianceInfo {
+                point: Some(joint.compliance),
+                ..default()
+            },
+        ));
+    }
+    if let Some(joint) = revolute {
+        return Some((
+            JointType::Revolute,
+            [joint.body1, joint.body2],
+            [joint.local_anchor1(), joint.local_anchor2()],
+            JointComplianceInfo {
+                point: Some(joint.point_compliance),
+                alignment: Some(joint.align_compliance),
+                limit: Some(joint.limit_compliance),
+                ..default()
+            },
+        ));
+    }
+    if let Some(joint) = prismatic {
+        return Some((
+            JointType::Prismatic,
+            [joint.body1, joint.body2],
+            [joint.local_anchor1(), joint.local_anchor2()],
+            JointComplianceInfo {
+                alignment: Some(joint.align_compliance),
+                angle: Some(joint.angle_compliance),
+                limit: Some(joint.limit_compliance),
+                ..default()
+            },
+        ));
+    }
+    spherical.map(|joint| {
+        (
+            JointType::Spherical,
+            [joint.body1, joint.body2],
+            [joint.local_anchor1(), joint.local_anchor2()],
+            JointComplianceInfo {
+                point: Some(joint.point_compliance),
+                swing: Some(joint.swing_compliance),
+                twist: Some(joint.twist_compliance),
+                ..default()
+            },
+        )
+    })
 }
 
 fn collider_shape_name(collider: &Collider) -> String {
@@ -402,6 +901,12 @@ fn collider_shape_name(collider: &Collider) -> String {
 struct InspectorPanel;
 
 #[derive(Component)]
+struct InspectorBodySection;
+
+#[derive(Component)]
+struct InspectorJointSection;
+
+#[derive(Component)]
 struct InspectorText;
 
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
@@ -420,6 +925,21 @@ enum InspectorControl {
         step: StepDirection,
     },
     CycleBody,
+    ToggleJointEnabled,
+    DeleteJoint,
+    JointAnchor {
+        body: JointBody,
+        axis: Axis,
+        step: StepDirection,
+    },
+    JointCompliance {
+        property: JointComplianceProperty,
+        step: StepDirection,
+    },
+    JointDamping {
+        kind: JointDampingKind,
+        step: StepDirection,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -429,6 +949,28 @@ enum ScalarProperty {
     LinearDamping,
     AngularDamping,
     Dominance,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum JointBody {
+    First,
+    Second,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum JointComplianceProperty {
+    Point,
+    Alignment,
+    Angle,
+    Limit,
+    Swing,
+    Twist,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum JointDampingKind {
+    Linear,
+    Angular,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -467,6 +1009,16 @@ enum InspectorValueProperty {
     AxisLock(AxisLockKind, Axis),
     Velocity(VelocityKind, Axis),
     Body,
+    Joint(JointValueProperty),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum JointValueProperty {
+    Enabled,
+    Anchor(JointBody, Axis),
+    Compliance(JointComplianceProperty),
+    Damping(JointDampingKind),
+    Stress,
 }
 
 fn spawn_inspector_ui(mut commands: Commands) {
@@ -495,34 +1047,250 @@ fn spawn_inspector_ui(mut commands: Commands) {
                 TextColor(PANEL_TEXT),
                 InspectorText,
             ));
-            parent.spawn((
-                Text::new("EDITABLE PROPERTIES (click +/-)"),
-                TextFont::from_font_size(14.0),
-                TextColor(PANEL_TEXT),
-                Node {
-                    margin: UiRect::top(px(12.0)),
-                    ..default()
-                },
-            ));
+            parent
+                .spawn((
+                    Node {
+                        flex_direction: FlexDirection::Column,
+                        ..default()
+                    },
+                    InspectorBodySection,
+                ))
+                .with_children(|parent| {
+                    parent.spawn((
+                        Text::new("EDITABLE PROPERTIES (click +/-)"),
+                        TextFont::from_font_size(14.0),
+                        TextColor(PANEL_TEXT),
+                        Node {
+                            margin: UiRect::top(px(12.0)),
+                            ..default()
+                        },
+                    ));
 
-            spawn_scalar_row(parent, "Mass", ScalarProperty::Mass);
-            spawn_scalar_row(parent, "Gravity scale", ScalarProperty::GravityScale);
-            spawn_scalar_row(parent, "Linear damping", ScalarProperty::LinearDamping);
-            spawn_scalar_row(parent, "Angular damping", ScalarProperty::AngularDamping);
-            spawn_scalar_row(parent, "Dominance", ScalarProperty::Dominance);
-            spawn_body_row(parent);
-            for kind in [AxisLockKind::Translation, AxisLockKind::Rotation] {
-                for axis in [Axis::X, Axis::Y, Axis::Z] {
-                    spawn_axis_lock_row(parent, kind, axis);
-                }
-            }
-            for axis in [Axis::X, Axis::Y, Axis::Z] {
-                spawn_velocity_row(parent, VelocityKind::Linear, axis);
-            }
-            for axis in [Axis::X, Axis::Y, Axis::Z] {
-                spawn_velocity_row(parent, VelocityKind::Angular, axis);
-            }
+                    spawn_scalar_row(parent, "Mass", ScalarProperty::Mass);
+                    spawn_scalar_row(parent, "Gravity scale", ScalarProperty::GravityScale);
+                    spawn_scalar_row(parent, "Linear damping", ScalarProperty::LinearDamping);
+                    spawn_scalar_row(parent, "Angular damping", ScalarProperty::AngularDamping);
+                    spawn_scalar_row(parent, "Dominance", ScalarProperty::Dominance);
+                    spawn_body_row(parent);
+                    for kind in [AxisLockKind::Translation, AxisLockKind::Rotation] {
+                        for axis in [Axis::X, Axis::Y, Axis::Z] {
+                            spawn_axis_lock_row(parent, kind, axis);
+                        }
+                    }
+                    for axis in [Axis::X, Axis::Y, Axis::Z] {
+                        spawn_velocity_row(parent, VelocityKind::Linear, axis);
+                    }
+                    for axis in [Axis::X, Axis::Y, Axis::Z] {
+                        spawn_velocity_row(parent, VelocityKind::Angular, axis);
+                    }
+                });
+
+            parent
+                .spawn((
+                    Node {
+                        display: Display::None,
+                        flex_direction: FlexDirection::Column,
+                        ..default()
+                    },
+                    InspectorJointSection,
+                ))
+                .with_children(spawn_joint_inspector_ui);
         });
+}
+
+fn spawn_joint_inspector_ui(parent: &mut ChildSpawnerCommands) {
+    parent.spawn((
+        Text::new("JOINT CONFIGURATION (click +/-)"),
+        TextFont::from_font_size(14.0),
+        TextColor(PANEL_TEXT),
+        Node {
+            margin: UiRect::top(px(12.0)),
+            ..default()
+        },
+    ));
+    spawn_joint_toggle_row(parent);
+    for body in [JointBody::First, JointBody::Second] {
+        for axis in [Axis::X, Axis::Y, Axis::Z] {
+            spawn_joint_anchor_row(parent, body, axis);
+        }
+    }
+    for property in [
+        JointComplianceProperty::Point,
+        JointComplianceProperty::Alignment,
+        JointComplianceProperty::Angle,
+        JointComplianceProperty::Limit,
+        JointComplianceProperty::Swing,
+        JointComplianceProperty::Twist,
+    ] {
+        spawn_joint_compliance_row(parent, property);
+    }
+    spawn_joint_damping_row(parent, JointDampingKind::Linear);
+    spawn_joint_damping_row(parent, JointDampingKind::Angular);
+    parent.spawn((
+        Text::new("STRESS / SOLVER OUTPUT"),
+        TextFont::from_font_size(13.0),
+        TextColor(PANEL_TEXT),
+        Node {
+            margin: UiRect::top(px(8.0)),
+            ..default()
+        },
+    ));
+    parent.spawn((
+        Text::new("-"),
+        TextFont::from_font_size(12.0),
+        TextColor(PANEL_TEXT),
+        InspectorValueText {
+            property: InspectorValueProperty::Joint(JointValueProperty::Stress),
+        },
+    ));
+}
+
+fn spawn_joint_toggle_row(parent: &mut ChildSpawnerCommands) {
+    parent.spawn(control_row_node()).with_children(|row| {
+        row.spawn(control_label("Enabled"));
+        spawn_control_button(row, "toggle", InspectorControl::ToggleJointEnabled);
+        row.spawn((
+            Text::new("-"),
+            TextFont::from_font_size(14.0),
+            TextColor(PANEL_TEXT),
+            InspectorValueText {
+                property: InspectorValueProperty::Joint(JointValueProperty::Enabled),
+            },
+            Node {
+                width: px(100.0),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+        ));
+        spawn_control_button(row, "delete", InspectorControl::DeleteJoint);
+    });
+}
+
+fn spawn_joint_anchor_row(parent: &mut ChildSpawnerCommands, body: JointBody, axis: Axis) {
+    parent.spawn(control_row_node()).with_children(|row| {
+        row.spawn(control_label(match (body, axis) {
+            (JointBody::First, Axis::X) => "Anchor 1 X",
+            (JointBody::First, Axis::Y) => "Anchor 1 Y",
+            (JointBody::First, Axis::Z) => "Anchor 1 Z",
+            (JointBody::Second, Axis::X) => "Anchor 2 X",
+            (JointBody::Second, Axis::Y) => "Anchor 2 Y",
+            (JointBody::Second, Axis::Z) => "Anchor 2 Z",
+        }));
+        spawn_control_button(
+            row,
+            "-",
+            InspectorControl::JointAnchor {
+                body,
+                axis,
+                step: StepDirection::Down,
+            },
+        );
+        row.spawn((
+            Text::new("-"),
+            TextFont::from_font_size(14.0),
+            TextColor(PANEL_TEXT),
+            InspectorValueText {
+                property: InspectorValueProperty::Joint(JointValueProperty::Anchor(body, axis)),
+            },
+            Node {
+                width: px(100.0),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+        ));
+        spawn_control_button(
+            row,
+            "+",
+            InspectorControl::JointAnchor {
+                body,
+                axis,
+                step: StepDirection::Up,
+            },
+        );
+    });
+}
+
+fn spawn_joint_compliance_row(
+    parent: &mut ChildSpawnerCommands,
+    property: JointComplianceProperty,
+) {
+    parent.spawn(control_row_node()).with_children(|row| {
+        row.spawn(control_label(match property {
+            JointComplianceProperty::Point => "Point compliance",
+            JointComplianceProperty::Alignment => "Alignment compliance",
+            JointComplianceProperty::Angle => "Angle compliance",
+            JointComplianceProperty::Limit => "Limit compliance",
+            JointComplianceProperty::Swing => "Swing compliance",
+            JointComplianceProperty::Twist => "Twist compliance",
+        }));
+        spawn_control_button(
+            row,
+            "-",
+            InspectorControl::JointCompliance {
+                property,
+                step: StepDirection::Down,
+            },
+        );
+        row.spawn((
+            Text::new("-"),
+            TextFont::from_font_size(14.0),
+            TextColor(PANEL_TEXT),
+            InspectorValueText {
+                property: InspectorValueProperty::Joint(JointValueProperty::Compliance(property)),
+            },
+            Node {
+                width: px(100.0),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+        ));
+        spawn_control_button(
+            row,
+            "+",
+            InspectorControl::JointCompliance {
+                property,
+                step: StepDirection::Up,
+            },
+        );
+    });
+}
+
+fn spawn_joint_damping_row(parent: &mut ChildSpawnerCommands, kind: JointDampingKind) {
+    parent.spawn(control_row_node()).with_children(|row| {
+        row.spawn(control_label(match kind {
+            JointDampingKind::Linear => "Linear joint damping",
+            JointDampingKind::Angular => "Angular joint damping",
+        }));
+        spawn_control_button(
+            row,
+            "-",
+            InspectorControl::JointDamping {
+                kind,
+                step: StepDirection::Down,
+            },
+        );
+        row.spawn((
+            Text::new("-"),
+            TextFont::from_font_size(14.0),
+            TextColor(PANEL_TEXT),
+            InspectorValueText {
+                property: InspectorValueProperty::Joint(JointValueProperty::Damping(kind)),
+            },
+            Node {
+                width: px(100.0),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+        ));
+        spawn_control_button(
+            row,
+            "+",
+            InspectorControl::JointDamping {
+                kind,
+                step: StepDirection::Up,
+            },
+        );
+    });
 }
 
 fn spawn_scalar_row(
@@ -717,6 +1485,8 @@ fn spawn_control_button(
 fn update_inspector_ui(
     inspector: Res<InspectorState>,
     mut panel: Query<&mut Node, With<InspectorPanel>>,
+    mut body_sections: Query<&mut Node, With<InspectorBodySection>>,
+    mut joint_sections: Query<&mut Node, With<InspectorJointSection>>,
     mut texts: ParamSet<(
         Query<&mut Text, With<InspectorText>>,
         Query<(&InspectorValueText, &mut Text)>,
@@ -726,20 +1496,37 @@ fn update_inspector_ui(
     let Ok(mut panel) = panel.single_mut() else {
         return;
     };
-    let Some(object) = inspector.object.as_ref() else {
+    if inspector.object.is_none() && inspector.joint.is_none() {
         panel.display = Display::None;
         if let Ok(mut summary_text) = texts.p0().single_mut() {
             summary_text.0.clear();
         }
         return;
-    };
+    }
 
     panel.display = Display::Flex;
+    for mut section in &mut body_sections {
+        section.display = inspector
+            .object
+            .as_ref()
+            .map_or(Display::None, |_| Display::Flex);
+    }
+    for mut section in &mut joint_sections {
+        section.display = inspector
+            .joint
+            .as_ref()
+            .map_or(Display::None, |_| Display::Flex);
+    }
     if let Ok(mut summary_text) = texts.p0().single_mut() {
-        summary_text.0 = format_inspector_text(object);
+        summary_text.0 = inspector
+            .object
+            .as_ref()
+            .map(format_inspector_text)
+            .or_else(|| inspector.joint.as_ref().map(format_joint_inspector_text))
+            .unwrap_or_default();
     }
     for (value, mut text) in &mut texts.p1() {
-        text.0 = format_inspector_value(object, value.property);
+        text.0 = format_inspector_value(&inspector, value.property);
     }
     for (interaction, mut color) in &mut buttons {
         *color = match interaction {
@@ -750,16 +1537,24 @@ fn update_inspector_ui(
     }
 }
 
-fn format_inspector_value(object: &InspectorSnapshot, property: InspectorValueProperty) -> String {
+fn format_inspector_value(inspector: &InspectorState, property: InspectorValueProperty) -> String {
     match property {
-        InspectorValueProperty::Scalar(property) => format_float(match property {
-            ScalarProperty::Mass => object.mass.unwrap_or(0.0),
-            ScalarProperty::GravityScale => object.gravity_scale,
-            ScalarProperty::LinearDamping => object.linear_damping,
-            ScalarProperty::AngularDamping => object.angular_damping,
-            ScalarProperty::Dominance => object.dominance as f32,
-        }),
+        InspectorValueProperty::Scalar(property) => {
+            let Some(object) = inspector.object.as_ref() else {
+                return "-".to_owned();
+            };
+            format_float(match property {
+                ScalarProperty::Mass => object.mass.unwrap_or(0.0),
+                ScalarProperty::GravityScale => object.gravity_scale,
+                ScalarProperty::LinearDamping => object.linear_damping,
+                ScalarProperty::AngularDamping => object.angular_damping,
+                ScalarProperty::Dominance => object.dominance as f32,
+            })
+        }
         InspectorValueProperty::AxisLock(kind, axis) => {
+            let Some(object) = inspector.object.as_ref() else {
+                return "-".to_owned();
+            };
             if axis_is_locked(LockedAxes::from_bits(object.locked_axes), kind, axis) {
                 "locked".to_owned()
             } else {
@@ -767,14 +1562,112 @@ fn format_inspector_value(object: &InspectorSnapshot, property: InspectorValuePr
             }
         }
         InspectorValueProperty::Velocity(kind, axis) => {
+            let Some(object) = inspector.object.as_ref() else {
+                return "-".to_owned();
+            };
             let velocity = match kind {
                 VelocityKind::Linear => object.linear_velocity,
                 VelocityKind::Angular => object.angular_velocity,
             };
             format_float(axis_value(velocity, axis))
         }
-        InspectorValueProperty::Body => format!("{:?}", object.body),
+        InspectorValueProperty::Body => inspector
+            .object
+            .as_ref()
+            .map_or_else(|| "-".to_owned(), |object| format!("{:?}", object.body)),
+        InspectorValueProperty::Joint(property) => {
+            let Some(joint) = inspector.joint.as_ref() else {
+                return "-".to_owned();
+            };
+            format_joint_value(joint, property)
+        }
     }
+}
+
+fn format_joint_value(joint: &JointInspectorSnapshot, property: JointValueProperty) -> String {
+    match property {
+        JointValueProperty::Enabled => {
+            if joint.enabled {
+                "enabled".to_owned()
+            } else {
+                "disabled".to_owned()
+            }
+        }
+        JointValueProperty::Anchor(body, axis) => match body {
+            JointBody::First => joint.anchor1,
+            JointBody::Second => joint.anchor2,
+        }
+        .map_or_else(
+            || "global".to_owned(),
+            |anchor| format_float(axis_value(anchor, axis)),
+        ),
+        JointValueProperty::Compliance(property) => compliance_value(joint.compliance, property)
+            .map_or_else(|| "n/a".to_owned(), format_float),
+        JointValueProperty::Damping(kind) => format_float(match kind {
+            JointDampingKind::Linear => joint.damping.linear,
+            JointDampingKind::Angular => joint.damping.angular,
+        }),
+        JointValueProperty::Stress => joint.stress.map_or_else(
+            || "unavailable".to_owned(),
+            |stress| {
+                format!(
+                    "force {} | torque {} | motor {}",
+                    format_vec3(stress.force),
+                    format_vec3(stress.torque),
+                    format_float(stress.motor_force),
+                )
+            },
+        ),
+    }
+}
+
+fn compliance_value(
+    compliance: JointComplianceInfo,
+    property: JointComplianceProperty,
+) -> Option<f32> {
+    match property {
+        JointComplianceProperty::Point => compliance.point,
+        JointComplianceProperty::Alignment => compliance.alignment,
+        JointComplianceProperty::Angle => compliance.angle,
+        JointComplianceProperty::Limit => compliance.limit,
+        JointComplianceProperty::Swing => compliance.swing,
+        JointComplianceProperty::Twist => compliance.twist,
+    }
+}
+
+fn format_joint_inspector_text(joint: &JointInspectorSnapshot) -> String {
+    let stress = joint.stress.map_or_else(
+        || "unavailable".to_owned(),
+        |stress| {
+            format!(
+                "force {} | torque {} | motor {}",
+                format_vec3(stress.force),
+                format_vec3(stress.torque),
+                format_float(stress.motor_force),
+            )
+        },
+    );
+    format!(
+        "{}\nEntity: {:?}\n\nJOINT\nType: {:?}\nEnabled: {}\nBody 1: {} ({:?})\nBody 2: {} ({:?})\nAnchor 1: {}\nAnchor 2: {}\nCompliance: {:?}\nDamping: linear {}, angular {}\nStress: {}",
+        joint.name,
+        joint.entity,
+        joint.joint_type,
+        joint.enabled,
+        joint.body1_name,
+        joint.body1,
+        joint.body2_name,
+        joint.body2,
+        joint
+            .anchor1
+            .map_or_else(|| "global/unknown".to_owned(), format_vec3),
+        joint
+            .anchor2
+            .map_or_else(|| "global/unknown".to_owned(), format_vec3),
+        joint.compliance,
+        format_float(joint.damping.linear),
+        format_float(joint.damping.angular),
+        stress,
+    )
 }
 
 fn format_inspector_text(object: &InspectorSnapshot) -> String {

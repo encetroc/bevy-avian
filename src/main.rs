@@ -5,6 +5,7 @@ mod axis_locks_station;
 mod camera;
 mod collider_debug;
 mod collider_shape_station;
+mod collision_event_log;
 mod cursor_hover;
 mod damping_station;
 mod density_mass_station;
@@ -35,6 +36,7 @@ use camera::CameraFollowPlugin;
 use camera::FixedFollowCamera;
 use collider_debug::ColliderDebugPlugin;
 use collider_shape_station::ColliderShapeStationPlugin;
+use collision_event_log::CollisionEventLogPlugin;
 use cursor_hover::CursorHoverPlugin;
 use damping_station::DampingStationPlugin;
 use density_mass_station::DensityMassStationPlugin;
@@ -78,6 +80,7 @@ fn main() {
             PlayerPlugin,
             StationLayoutPlugin,
         ))
+        .add_plugins(CollisionEventLogPlugin)
         .add_plugins((JointCreationPlugin, ObjectCompositionPlugin))
         .add_plugins((
             AxisLocksStationPlugin,

@@ -4,14 +4,14 @@
 
 **Blocked by:** 03, 06
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] All three body types are visibly labelled.
-- [ ] The kinematic platform repeatedly moves between two positions.
+- [x] All three body types are visibly labelled.
+- [x] The kinematic platform repeatedly moves between two positions.
 
 ## Tests
 
-- [ ] Place a dynamic object on the platform.
-- [ ] Push or collide with each body type and verify distinct behavior.
+- [x] Place a dynamic object on the platform.
+- [x] Push or collide with each body type and verify distinct behavior.

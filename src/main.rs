@@ -18,6 +18,7 @@ mod object_inspector;
 mod player;
 mod restitution_station;
 mod rigid_body_station;
+mod scene_collider_station;
 mod stations;
 
 use axis_locks_station::AxisLocksStationPlugin;
@@ -39,6 +40,7 @@ use object_inspector::ObjectInspectorPlugin;
 use player::PlayerPlugin;
 use restitution_station::RestitutionStationPlugin;
 use rigid_body_station::RigidBodyStationPlugin;
+use scene_collider_station::SceneColliderStationPlugin;
 use stations::StationLayoutPlugin;
 
 fn main() {
@@ -68,6 +70,7 @@ fn main() {
             RigidBodyStationPlugin,
             ColliderShapeStationPlugin,
             MeshColliderStationPlugin,
+            SceneColliderStationPlugin,
         ))
         .run();
 }

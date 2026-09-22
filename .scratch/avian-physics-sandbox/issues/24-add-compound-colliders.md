@@ -4,14 +4,14 @@
 
 **Blocked by:** 23
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] The component colliders move as one rigid body.
-- [ ] The compound outline differs from any single primitive.
+- [x] The component colliders move as one rigid body.
+- [x] The compound outline differs from any single primitive.
 
 ## Tests
 
-- [ ] Push and rotate the compound object.
-- [ ] Drop another object onto multiple parts and verify contacts.
+- [x] Push and rotate the compound object.
+- [x] Drop another object onto multiple parts and verify contacts.

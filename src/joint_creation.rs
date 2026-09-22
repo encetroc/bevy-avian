@@ -162,7 +162,7 @@ fn apply_joint_creation_actions(
     mut commands: Commands,
     mut actions: MessageReader<JointCreationAction>,
     mut state: ResMut<JointCreationState>,
-    bodies: Query<(&RigidBody, &Transform), With<Collider>>,
+    bodies: Query<&Transform, (With<Collider>, With<RigidBody>)>,
 ) {
     for action in actions.read() {
         match *action {
@@ -175,13 +175,10 @@ fn apply_joint_creation_actions(
                     state.phase = JointCreationPhase::AwaitingFirst;
                     continue;
                 }
-                let Ok([(body1, transform1), (body2, transform2)]) =
-                    bodies.get_many([first, second])
-                else {
+                let Ok([transform1, transform2]) = bodies.get_many([first, second]) else {
                     state.phase = JointCreationPhase::Inactive;
                     continue;
                 };
-                let _ = (body1, body2);
                 let anchor = (transform1.translation + transform2.translation) * 0.5;
                 let local_anchor1 =
                     transform1.rotation.inverse() * (anchor - transform1.translation);
@@ -558,13 +555,16 @@ mod tests {
                 joints.iter(world).next().expect("runtime joint")
             };
             let joint = app.world().entity(entity);
+            let has_expected_type = match joint_type {
+                RuntimeJointType::Fixed => joint.contains::<FixedJoint>(),
+                RuntimeJointType::Distance => joint.contains::<DistanceJoint>(),
+                RuntimeJointType::Revolute => joint.contains::<RevoluteJoint>(),
+                RuntimeJointType::Prismatic => joint.contains::<PrismaticJoint>(),
+                RuntimeJointType::Spherical => joint.contains::<SphericalJoint>(),
+            };
             assert!(
-                joint.contains::<FixedJoint>()
-                    || joint.contains::<DistanceJoint>()
-                    || joint.contains::<RevoluteJoint>()
-                    || joint.contains::<PrismaticJoint>()
-                    || joint.contains::<SphericalJoint>(),
-                "case {index} did not add an Avian joint"
+                has_expected_type,
+                "case {index} added the wrong Avian joint type"
             );
             assert_eq!(
                 app.world().resource::<JointCreationState>().phase,

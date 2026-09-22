@@ -4,14 +4,14 @@
 
 **Blocked by:** 03, 06
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] Identical balls can be dropped onto each surface.
-- [ ] Bounce heights differ in a repeatable way.
+- [x] Identical balls can be dropped onto each surface.
+- [x] Bounce heights differ in a repeatable way.
 
 ## Tests
 
-- [ ] Drop matching balls from the same height.
-- [ ] Compare bounce behavior with debug visualization enabled.
+- [x] Drop matching balls from the same height.
+- [x] Compare bounce behavior with debug visualization enabled.

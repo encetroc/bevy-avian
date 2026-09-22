@@ -4,14 +4,14 @@
 
 **Blocked by:** 13
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] Each supported value can be edited without recompiling.
-- [ ] Changed values affect the next simulation frames.
+- [x] Each supported value can be edited without recompiling.
+- [x] Changed values affect the next simulation frames.
 
 ## Tests
 
-- [ ] Change mass and compare push response.
-- [ ] Change velocity and gravity scale and observe the resulting motion.
+- [x] Change mass and compare push response.
+- [x] Change velocity and gravity scale and observe the resulting motion.

@@ -4,6 +4,7 @@ use bevy::prelude::*;
 mod axis_locks_station;
 mod camera;
 mod collider_debug;
+mod collider_shape_station;
 mod cursor_hover;
 mod damping_station;
 mod density_mass_station;
@@ -23,6 +24,7 @@ use camera::CameraFollowPlugin;
 #[cfg(test)]
 use camera::FixedFollowCamera;
 use collider_debug::ColliderDebugPlugin;
+use collider_shape_station::ColliderShapeStationPlugin;
 use cursor_hover::CursorHoverPlugin;
 use damping_station::DampingStationPlugin;
 use density_mass_station::DensityMassStationPlugin;
@@ -62,6 +64,7 @@ fn main() {
             FrictionStationPlugin,
             RestitutionStationPlugin,
             RigidBodyStationPlugin,
+            ColliderShapeStationPlugin,
         ))
         .run();
 }

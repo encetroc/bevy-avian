@@ -406,6 +406,22 @@ mod tests {
                 .iter()
                 .any(|entry| entry.event_type == CollisionEventType::Contact)
         );
+
+        let body = body_entity(&mut app);
+        app.world_mut().entity_mut(body).insert((
+            Position(Vec3::new(0.0, 4.0, 0.0)),
+            Transform::from_xyz(0.0, 4.0, 0.0),
+            LinearVelocity::default(),
+        ));
+        run_steps(&mut app, 180);
+
+        let entries = app.world().resource::<CollisionEventLog>().entries.clone();
+        assert!(
+            entries
+                .iter()
+                .any(|entry| entry.event_type == CollisionEventType::Exit),
+            "separating the body should record an exit event: {entries:?}"
+        );
     }
 
     #[test]

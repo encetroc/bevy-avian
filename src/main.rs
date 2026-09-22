@@ -6,6 +6,7 @@ mod collider_debug;
 mod cursor_hover;
 mod dynamic_objects;
 mod force_station;
+mod gravity_controls;
 mod object_grabbing;
 mod object_inspector;
 mod player;
@@ -18,6 +19,7 @@ use collider_debug::ColliderDebugPlugin;
 use cursor_hover::CursorHoverPlugin;
 use dynamic_objects::DynamicObjectsPlugin;
 use force_station::ForceStationPlugin;
+use gravity_controls::GravityControlsPlugin;
 use object_grabbing::ObjectGrabbingPlugin;
 use object_inspector::ObjectInspectorPlugin;
 use player::PlayerPlugin;
@@ -36,6 +38,7 @@ fn main() {
             ArenaPlugin,
             DynamicObjectsPlugin,
             ForceStationPlugin,
+            GravityControlsPlugin,
             ObjectGrabbingPlugin,
             PlayerPlugin,
             StationLayoutPlugin,

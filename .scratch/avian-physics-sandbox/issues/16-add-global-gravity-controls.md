@@ -4,14 +4,14 @@
 
 **Blocked by:** 14
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] Gravity components can be edited at runtime.
-- [ ] Presets update the simulation immediately.
+- [x] Gravity components can be edited at runtime.
+- [x] Presets update the simulation immediately.
 
 ## Tests
 
-- [ ] Apply every preset and observe a test body.
-- [ ] Edit one gravity axis and verify directional motion.
+- [x] Apply every preset and observe a test body.
+- [x] Edit one gravity axis and verify directional motion.

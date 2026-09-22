@@ -4,14 +4,14 @@
 
 **Blocked by:** 06
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] The log records collision event types and participating entities.
-- [ ] The log can be cleared without affecting simulation.
+- [x] The log records collision event types and participating entities.
+- [x] The log can be cleared without affecting simulation.
 
 ## Tests
 
-- [ ] Drop an object onto the floor and inspect the event sequence.
-- [ ] Clear the log and verify new events still appear.
+- [x] Drop an object onto the floor and inspect the event sequence.
+- [x] Clear the log and verify new events still appear.

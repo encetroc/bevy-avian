@@ -8,6 +8,7 @@ mod collider_shape_station;
 mod cursor_hover;
 mod damping_station;
 mod density_mass_station;
+mod distance_joint_station;
 mod dynamic_objects;
 mod fixed_joint_station;
 mod force_station;
@@ -32,6 +33,7 @@ use collider_shape_station::ColliderShapeStationPlugin;
 use cursor_hover::CursorHoverPlugin;
 use damping_station::DampingStationPlugin;
 use density_mass_station::DensityMassStationPlugin;
+use distance_joint_station::DistanceJointStationPlugin;
 use dynamic_objects::DynamicObjectsPlugin;
 use fixed_joint_station::FixedJointStationPlugin;
 use force_station::ForceStationPlugin;
@@ -77,6 +79,7 @@ fn main() {
             SceneColliderStationPlugin,
             StackingStationPlugin,
             FixedJointStationPlugin,
+            DistanceJointStationPlugin,
         ))
         .run();
 }

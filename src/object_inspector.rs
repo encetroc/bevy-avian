@@ -70,6 +70,13 @@ pub struct JointStressInfo {
     pub motor_force: f32,
 }
 
+struct JointDetails {
+    joint_type: JointType,
+    bodies: [Entity; 2],
+    anchors: [Option<Vec3>; 2],
+    compliance: JointComplianceInfo,
+}
+
 /// A readable snapshot of the selected body's physics and current simulation state.
 #[derive(Clone, Debug, PartialEq)]
 pub struct InspectorSnapshot {
@@ -166,14 +173,7 @@ fn select_hovered_joint(
     cursor_ray: Res<CursorRay>,
     controls: Query<&Interaction, With<InspectorControl>>,
     mut selection: ResMut<SelectionState>,
-    joints: Query<(
-        Entity,
-        Option<&FixedJoint>,
-        Option<&DistanceJoint>,
-        Option<&RevoluteJoint>,
-        Option<&PrismaticJoint>,
-        Option<&SphericalJoint>,
-    )>,
+    joints: JointSelectionQuery<'_, '_>,
     bodies: Query<&Transform>,
 ) {
     if !mouse.just_pressed(MouseButton::Left)
@@ -197,27 +197,47 @@ fn select_hovered_joint(
 
 const JOINT_PICK_DISTANCE: f32 = 0.3;
 
+type JointSelectionQuery<'w, 's> = Query<
+    'w,
+    's,
+    (
+        Entity,
+        Option<&'static FixedJoint>,
+        Option<&'static DistanceJoint>,
+        Option<&'static RevoluteJoint>,
+        Option<&'static PrismaticJoint>,
+        Option<&'static SphericalJoint>,
+    ),
+>;
+
+type JointInspectorQuery<'w, 's> = Query<
+    'w,
+    's,
+    (
+        Option<&'static Name>,
+        Option<&'static FixedJoint>,
+        Option<&'static DistanceJoint>,
+        Option<&'static RevoluteJoint>,
+        Option<&'static PrismaticJoint>,
+        Option<&'static SphericalJoint>,
+        Option<&'static JointDamping>,
+        Option<&'static JointForces>,
+        Has<JointDisabled>,
+    ),
+>;
+
 fn closest_joint_to_ray(
     ray: Ray3d,
-    joints: &Query<(
-        Entity,
-        Option<&FixedJoint>,
-        Option<&DistanceJoint>,
-        Option<&RevoluteJoint>,
-        Option<&PrismaticJoint>,
-        Option<&SphericalJoint>,
-    )>,
+    joints: &JointSelectionQuery<'_, '_>,
     body_transforms: &Query<&Transform>,
 ) -> Option<(Entity, f32)> {
     let mut closest = None;
     for (entity, fixed, distance, revolute, prismatic, spherical) in joints.iter() {
-        let Some((_, joint_bodies, anchors, _)) =
-            joint_details(fixed, distance, revolute, prismatic, spherical)
-        else {
+        let Some(details) = joint_details(fixed, distance, revolute, prismatic, spherical) else {
             continue;
         };
-        let [body1, body2] = joint_bodies;
-        let [Some(local_anchor1), Some(local_anchor2)] = anchors else {
+        let [body1, body2] = details.bodies;
+        let [Some(local_anchor1), Some(local_anchor2)] = details.anchors else {
             continue;
         };
         let Ok([transform1, transform2]) = body_transforms.get_many([body1, body2]) else {
@@ -669,17 +689,7 @@ fn refresh_inspector(
         Has<SleepingDisabled>,
     )>,
     joint_names: Query<&Name>,
-    joints: Query<(
-        Option<&Name>,
-        Option<&FixedJoint>,
-        Option<&DistanceJoint>,
-        Option<&RevoluteJoint>,
-        Option<&PrismaticJoint>,
-        Option<&SphericalJoint>,
-        Option<&JointDamping>,
-        Option<&JointForces>,
-        Has<JointDisabled>,
-    )>,
+    joints: JointInspectorQuery<'_, '_>,
 ) {
     let selected = selection.entity;
     let next_object = selected.and_then(|entity| {
@@ -758,9 +768,8 @@ fn refresh_inspector(
     let next_joint = selected.and_then(|entity| {
         let (name, fixed, distance, revolute, prismatic, spherical, damping, forces, disabled) =
             joints.get(entity).ok()?;
-        let (joint_type, bodies, anchors, compliance) =
-            joint_details(fixed, distance, revolute, prismatic, spherical)?;
-        let [body1, body2] = bodies;
+        let details = joint_details(fixed, distance, revolute, prismatic, spherical)?;
+        let [body1, body2] = details.bodies;
         let stress = forces.map(|forces| JointStressInfo {
             force: forces.force(),
             torque: forces.torque(),
@@ -772,14 +781,14 @@ fn refresh_inspector(
             name: name
                 .map(|name| name.as_str().to_owned())
                 .unwrap_or_else(|| format!("Physics Joint {entity:?}")),
-            joint_type,
+            joint_type: details.joint_type,
             body1,
             body2,
             body1_name: joint_entity_name(&joint_names, body1),
             body2_name: joint_entity_name(&joint_names, body2),
-            anchor1: anchors[0],
-            anchor2: anchors[1],
-            compliance,
+            anchor1: details.anchors[0],
+            anchor2: details.anchors[1],
+            compliance: details.compliance,
             damping: damping.map_or(JointDampingInfo::default(), |damping| JointDampingInfo {
                 linear: damping.linear,
                 angular: damping.angular,
@@ -812,73 +821,66 @@ fn joint_details(
     revolute: Option<&RevoluteJoint>,
     prismatic: Option<&PrismaticJoint>,
     spherical: Option<&SphericalJoint>,
-) -> Option<(
-    JointType,
-    [Entity; 2],
-    [Option<Vec3>; 2],
-    JointComplianceInfo,
-)> {
+) -> Option<JointDetails> {
     if let Some(joint) = fixed {
-        return Some((
-            JointType::Fixed,
-            [joint.body1, joint.body2],
-            [joint.local_anchor1(), joint.local_anchor2()],
-            JointComplianceInfo {
+        return Some(JointDetails {
+            joint_type: JointType::Fixed,
+            bodies: [joint.body1, joint.body2],
+            anchors: [joint.local_anchor1(), joint.local_anchor2()],
+            compliance: JointComplianceInfo {
                 point: Some(joint.point_compliance),
                 angle: Some(joint.angle_compliance),
                 ..default()
             },
-        ));
+        });
     }
     if let Some(joint) = distance {
-        return Some((
-            JointType::Distance,
-            [joint.body1, joint.body2],
-            [joint.local_anchor1(), joint.local_anchor2()],
-            JointComplianceInfo {
+        return Some(JointDetails {
+            joint_type: JointType::Distance,
+            bodies: [joint.body1, joint.body2],
+            anchors: [joint.local_anchor1(), joint.local_anchor2()],
+            compliance: JointComplianceInfo {
                 point: Some(joint.compliance),
                 ..default()
             },
-        ));
+        });
     }
     if let Some(joint) = revolute {
-        return Some((
-            JointType::Revolute,
-            [joint.body1, joint.body2],
-            [joint.local_anchor1(), joint.local_anchor2()],
-            JointComplianceInfo {
+        return Some(JointDetails {
+            joint_type: JointType::Revolute,
+            bodies: [joint.body1, joint.body2],
+            anchors: [joint.local_anchor1(), joint.local_anchor2()],
+            compliance: JointComplianceInfo {
                 point: Some(joint.point_compliance),
                 alignment: Some(joint.align_compliance),
                 limit: Some(joint.limit_compliance),
                 ..default()
             },
-        ));
+        });
     }
     if let Some(joint) = prismatic {
-        return Some((
-            JointType::Prismatic,
-            [joint.body1, joint.body2],
-            [joint.local_anchor1(), joint.local_anchor2()],
-            JointComplianceInfo {
+        return Some(JointDetails {
+            joint_type: JointType::Prismatic,
+            bodies: [joint.body1, joint.body2],
+            anchors: [joint.local_anchor1(), joint.local_anchor2()],
+            compliance: JointComplianceInfo {
                 alignment: Some(joint.align_compliance),
                 angle: Some(joint.angle_compliance),
                 limit: Some(joint.limit_compliance),
                 ..default()
             },
-        ));
+        });
     }
-    spherical.map(|joint| {
-        (
-            JointType::Spherical,
-            [joint.body1, joint.body2],
-            [joint.local_anchor1(), joint.local_anchor2()],
-            JointComplianceInfo {
-                point: Some(joint.point_compliance),
-                swing: Some(joint.swing_compliance),
-                twist: Some(joint.twist_compliance),
-                ..default()
-            },
-        )
+    spherical.map(|joint| JointDetails {
+        joint_type: JointType::Spherical,
+        bodies: [joint.body1, joint.body2],
+        anchors: [joint.local_anchor1(), joint.local_anchor2()],
+        compliance: JointComplianceInfo {
+            point: Some(joint.point_compliance),
+            swing: Some(joint.swing_compliance),
+            twist: Some(joint.twist_compliance),
+            ..default()
+        },
     })
 }
 

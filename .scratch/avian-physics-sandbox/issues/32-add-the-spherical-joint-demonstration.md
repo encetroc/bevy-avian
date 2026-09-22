@@ -4,14 +4,14 @@
 
 **Blocked by:** 28
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] The object remains connected to its anchor.
-- [ ] The object can rotate freely within the joint model.
+- [x] The object remains connected to its anchor.
+- [x] The object can rotate freely within the joint model.
 
 ## Tests
 
-- [ ] Apply impulses from multiple directions.
-- [ ] Verify the anchor does not drift with the body.
+- [x] Apply impulses from multiple directions.
+- [x] Verify the anchor does not drift with the body.

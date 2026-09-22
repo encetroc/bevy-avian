@@ -3,6 +3,7 @@ use bevy::prelude::*;
 
 use crate::camera::FixedFollowCamera;
 use crate::player::{Player, PlayerInput, PlayerMovementSet, PlayerMovementSettings};
+use crate::stations::StationObject;
 
 /// The four lightweight rigid bodies used by the basic interaction test.
 #[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
@@ -200,14 +201,16 @@ fn spawn_dynamic_test_objects(
             materials.add(color)
         });
 
+        let initial_transform = Transform::from_translation(definition.position);
         let mut object = commands.spawn((
             DynamicTestObject {
                 kind: definition.kind,
             },
+            StationObject::new('A', initial_transform).with_velocities(Vec3::ZERO, Vec3::ZERO),
             RigidBody::Dynamic,
             definition.collider(),
             ColliderDensity(definition.density),
-            Transform::from_translation(definition.position),
+            initial_transform,
             Name::new(format!("Dynamic {}", definition.kind.label())),
         ));
 

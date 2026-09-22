@@ -1,4 +1,6 @@
+use avian3d::prelude::{AngularVelocity, LinearVelocity, Position, Rotation};
 use bevy::prelude::*;
+use std::collections::HashSet;
 
 /// Owns the connected, labelled test stations that make up the sandbox map.
 ///
@@ -8,10 +10,15 @@ pub struct StationLayoutPlugin;
 
 impl Plugin for StationLayoutPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_station_layout).add_systems(
-            Update,
-            draw_station_labels.run_if(resource_exists::<GizmoConfigStore>),
-        );
+        app.add_message::<ResetStation>()
+            .add_systems(Startup, spawn_station_layout)
+            .add_systems(
+                Update,
+                (
+                    reset_station_objects,
+                    draw_station_labels.run_if(resource_exists::<GizmoConfigStore>),
+                ),
+            );
     }
 }
 
@@ -20,6 +27,46 @@ impl Plugin for StationLayoutPlugin {
 pub struct Station {
     pub code: char,
     pub name: &'static str,
+}
+
+/// The initial state and station ownership of a resettable baseline object.
+///
+/// Baseline objects stay in the world when a station is reset. The reset
+/// message restores this state rather than replacing the entity, so references
+/// held by other systems remain valid.
+#[derive(Component, Clone, Copy, Debug, PartialEq)]
+pub struct StationObject {
+    pub station: char,
+    pub initial_transform: Transform,
+    pub initial_linear_velocity: Vec3,
+    pub initial_angular_velocity: Vec3,
+}
+
+impl StationObject {
+    pub const fn new(station: char, initial_transform: Transform) -> Self {
+        Self {
+            station,
+            initial_transform,
+            initial_linear_velocity: Vec3::ZERO,
+            initial_angular_velocity: Vec3::ZERO,
+        }
+    }
+
+    pub const fn with_velocities(mut self, linear_velocity: Vec3, angular_velocity: Vec3) -> Self {
+        self.initial_linear_velocity = linear_velocity;
+        self.initial_angular_velocity = angular_velocity;
+        self
+    }
+}
+
+/// Requests that one station restore its baseline objects.
+///
+/// Station-specific controls can observe the same message to restore their
+/// own state. Each message is scoped to one station, which keeps a local reset
+/// from affecting unrelated stations.
+#[derive(Message, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ResetStation {
+    pub code: char,
 }
 
 /// Marks the station entity as having a readable in-world label.
@@ -159,6 +206,51 @@ fn station_position(code: char) -> Vec3 {
         .expect("station connection references a declared station")
 }
 
+type StationObjectQuery<'w, 's> = Query<
+    'w,
+    's,
+    (
+        &'static StationObject,
+        &'static mut Transform,
+        Option<&'static mut Position>,
+        Option<&'static mut Rotation>,
+        Option<&'static mut LinearVelocity>,
+        Option<&'static mut AngularVelocity>,
+    ),
+>;
+
+fn reset_station_objects(
+    mut requests: MessageReader<ResetStation>,
+    mut objects: StationObjectQuery,
+) {
+    let requested_stations: HashSet<char> = requests.read().map(|request| request.code).collect();
+    if requested_stations.is_empty() {
+        return;
+    }
+
+    for (object, mut transform, position, rotation, linear_velocity, angular_velocity) in
+        &mut objects
+    {
+        if !requested_stations.contains(&object.station) {
+            continue;
+        }
+
+        *transform = object.initial_transform;
+        if let Some(mut position) = position {
+            position.0 = object.initial_transform.translation;
+        }
+        if let Some(mut rotation) = rotation {
+            rotation.0 = object.initial_transform.rotation;
+        }
+        if let Some(mut linear_velocity) = linear_velocity {
+            linear_velocity.0 = object.initial_linear_velocity;
+        }
+        if let Some(mut angular_velocity) = angular_velocity {
+            angular_velocity.0 = object.initial_angular_velocity;
+        }
+    }
+}
+
 fn draw_station_labels(mut gizmos: Gizmos, stations: Query<(&StationLabel, &Transform)>) {
     for (label, transform) in &stations {
         let text = format!("{}\n{}", label.code, label.name);
@@ -174,7 +266,7 @@ fn draw_station_labels(mut gizmos: Gizmos, stations: Query<(&StationLabel, &Tran
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashMap;
     use std::time::Duration;
 
     use bevy::{mesh::MeshPlugin, time::TimeUpdateStrategy};
@@ -264,5 +356,68 @@ mod tests {
             assert!(station.position.x.abs() + half_size.x <= 10.0);
             assert!(station.position.z.abs() + half_size.z <= 10.0);
         }
+    }
+
+    #[test]
+    fn resetting_one_station_restores_its_objects_without_touching_another() {
+        let mut app = station_app();
+        app.update();
+
+        let initial_a =
+            Transform::from_xyz(-6.0, 1.0, -6.0).with_rotation(Quat::from_rotation_y(0.35));
+        let initial_b =
+            Transform::from_xyz(0.0, 1.0, -6.0).with_rotation(Quat::from_rotation_x(-0.2));
+        let station_a = app
+            .world_mut()
+            .spawn((
+                StationObject::new('A', initial_a)
+                    .with_velocities(Vec3::new(0.5, 0.0, 0.0), Vec3::new(0.0, 0.25, 0.0)),
+                initial_a,
+                Position(Vec3::new(-6.0, 1.0, -6.0)),
+                Rotation(initial_a.rotation),
+                LinearVelocity(Vec3::new(0.5, 0.0, 0.0)),
+                AngularVelocity(Vec3::new(0.0, 0.25, 0.0)),
+            ))
+            .id();
+        let station_b = app
+            .world_mut()
+            .spawn((StationObject::new('B', initial_b), initial_b))
+            .id();
+
+        let disturbed_a = Transform::from_xyz(3.0, 4.0, 5.0);
+        let disturbed_b = Transform::from_xyz(-3.0, 2.0, 1.0);
+        app.world_mut().entity_mut(station_a).insert((
+            disturbed_a,
+            Position(disturbed_a.translation),
+            Rotation(disturbed_a.rotation),
+            LinearVelocity(Vec3::new(9.0, 8.0, 7.0)),
+            AngularVelocity(Vec3::new(6.0, 5.0, 4.0)),
+        ));
+        app.world_mut().entity_mut(station_b).insert(disturbed_b);
+
+        app.world_mut()
+            .resource_mut::<Messages<ResetStation>>()
+            .write(ResetStation { code: 'A' });
+        app.update();
+
+        let a = app.world().entity(station_a);
+        assert_eq!(a.get::<Transform>(), Some(&initial_a));
+        assert_eq!(a.get::<Position>(), Some(&Position(initial_a.translation)));
+        assert_eq!(a.get::<Rotation>(), Some(&Rotation(initial_a.rotation)));
+        assert_eq!(
+            a.get::<LinearVelocity>(),
+            Some(&LinearVelocity(Vec3::new(0.5, 0.0, 0.0)))
+        );
+        assert_eq!(
+            a.get::<AngularVelocity>(),
+            Some(&AngularVelocity(Vec3::new(0.0, 0.25, 0.0)))
+        );
+        assert_eq!(
+            app.world().entity(station_b).get::<Transform>(),
+            Some(&disturbed_b)
+        );
+
+        let mut objects = app.world_mut().query::<&StationObject>();
+        assert_eq!(objects.iter(app.world()).count(), 2);
     }
 }

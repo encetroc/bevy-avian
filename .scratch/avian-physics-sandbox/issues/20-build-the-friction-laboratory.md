@@ -4,14 +4,14 @@
 
 **Blocked by:** 03, 06
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] Lanes have distinct friction values and labels.
-- [ ] Identical objects slide different distances.
+- [x] Lanes have distinct friction values and labels.
+- [x] Identical objects slide different distances.
 
 ## Tests
 
-- [ ] Release matching objects simultaneously.
-- [ ] Verify the ordering of travel distances is repeatable.
+- [x] Release matching objects simultaneously.
+- [x] Verify the ordering of travel distances is repeatable.

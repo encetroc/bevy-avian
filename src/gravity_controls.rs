@@ -462,6 +462,37 @@ mod tests {
     }
 
     #[test]
+    fn clicking_each_preset_control_applies_its_vector() {
+        let mut app = gravity_app();
+        app.update();
+
+        for preset in GravityPreset::ALL {
+            let control = {
+                let world = app.world_mut();
+                let mut controls = world.query::<(Entity, &GravityControl)>();
+                controls
+                    .iter(world)
+                    .find_map(|(entity, control)| {
+                        (*control == GravityControl::Preset(preset)).then_some(entity)
+                    })
+                    .expect("gravity preset control")
+            };
+            *app.world_mut()
+                .entity_mut(control)
+                .get_mut::<Interaction>()
+                .expect("button interaction") = Interaction::Pressed;
+            app.update();
+            assert_eq!(app.world().resource::<Gravity>().0, preset.gravity());
+
+            *app.world_mut()
+                .entity_mut(control)
+                .get_mut::<Interaction>()
+                .expect("button interaction") = Interaction::None;
+            app.update();
+        }
+    }
+
+    #[test]
     fn clicking_an_axis_control_updates_the_global_resource() {
         let mut app = gravity_app();
         app.update();

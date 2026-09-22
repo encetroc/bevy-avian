@@ -106,8 +106,8 @@ const STATIONS: [StationDefinition; 10] = [
     StationDefinition {
         code: 'J',
         name: "Free Sandbox",
-        position: Vec3::new(0.0, 0.0, 8.8),
-        pad_size: Vec3::new(4.3, 0.12, 1.8),
+        position: Vec3::new(0.0, 0.0, 8.5),
+        pad_size: Vec3::new(8.0, 0.12, 2.6),
     },
 ];
 

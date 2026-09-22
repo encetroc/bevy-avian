@@ -19,6 +19,7 @@ mod player;
 mod restitution_station;
 mod rigid_body_station;
 mod scene_collider_station;
+mod stacking_station;
 mod stations;
 
 use axis_locks_station::AxisLocksStationPlugin;
@@ -41,6 +42,7 @@ use player::PlayerPlugin;
 use restitution_station::RestitutionStationPlugin;
 use rigid_body_station::RigidBodyStationPlugin;
 use scene_collider_station::SceneColliderStationPlugin;
+use stacking_station::StackingStationPlugin;
 use stations::StationLayoutPlugin;
 
 fn main() {
@@ -71,6 +73,7 @@ fn main() {
             ColliderShapeStationPlugin,
             MeshColliderStationPlugin,
             SceneColliderStationPlugin,
+            StackingStationPlugin,
         ))
         .run();
 }

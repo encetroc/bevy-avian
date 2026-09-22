@@ -19,6 +19,7 @@ mod object_grabbing;
 mod object_inspector;
 mod player;
 mod restitution_station;
+mod revolute_joint_station;
 mod rigid_body_station;
 mod scene_collider_station;
 mod stacking_station;
@@ -44,6 +45,7 @@ use object_grabbing::ObjectGrabbingPlugin;
 use object_inspector::ObjectInspectorPlugin;
 use player::PlayerPlugin;
 use restitution_station::RestitutionStationPlugin;
+use revolute_joint_station::RevoluteJointStationPlugin;
 use rigid_body_station::RigidBodyStationPlugin;
 use scene_collider_station::SceneColliderStationPlugin;
 use stacking_station::StackingStationPlugin;
@@ -80,6 +82,7 @@ fn main() {
             StackingStationPlugin,
             FixedJointStationPlugin,
             DistanceJointStationPlugin,
+            RevoluteJointStationPlugin,
         ))
         .run();
 }

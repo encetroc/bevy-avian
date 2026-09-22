@@ -332,6 +332,27 @@ mod tests {
     }
 
     #[test]
+    fn movement_uses_the_camera_horizontal_basis() {
+        let mut app = player_app();
+        app.update();
+        let initial = player_position(&mut app);
+        app.world_mut().spawn((
+            FixedFollowCamera,
+            Transform::from_rotation(Quat::from_rotation_y(-std::f32::consts::FRAC_PI_2)),
+        ));
+
+        hold_key(&mut app, KeyCode::KeyW, 30);
+
+        let displacement = player_position(&mut app) - initial;
+        assert!(displacement.x > 1.0, "camera-relative W did not move right");
+        assert!(
+            displacement.z.abs() < 0.1,
+            "camera-relative movement drifted: {displacement:?}"
+        );
+        assert!(displacement.y.abs() < 0.1, "movement left the ground plane");
+    }
+
+    #[test]
     fn player_settles_on_the_floor_and_is_marked_grounded() {
         let mut app = player_app();
         app.update();

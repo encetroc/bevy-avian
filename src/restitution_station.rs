@@ -633,6 +633,33 @@ mod tests {
     }
 
     #[test]
+    fn reset_returns_all_balls_to_the_same_drop_height() {
+        let mut app = restitution_app();
+        app.update();
+        let entities = object_entities(&mut app);
+        drop_balls(&mut app);
+        run_steps(&mut app, 30);
+
+        app.world_mut()
+            .resource_mut::<Messages<RestitutionLabAction>>()
+            .write(RestitutionLabAction::Reset);
+        app.update();
+
+        for kind in RestitutionSurfaceKind::ALL {
+            let entity = entities[&kind];
+            assert!((position(&app, entity).y - BALL_START_Y).abs() < 0.001);
+            assert_eq!(
+                app.world()
+                    .entity(entity)
+                    .get::<LinearVelocity>()
+                    .expect("restitution ball velocity")
+                    .0,
+                Vec3::ZERO
+            );
+        }
+    }
+
+    #[test]
     fn bounce_order_remains_visible_with_avian_collider_debug_enabled() {
         let mut app = restitution_app_with_debug(true);
         app.update();

@@ -14,6 +14,7 @@ mod fixed_joint_station;
 mod force_station;
 mod friction_station;
 mod gravity_controls;
+mod joint_creation;
 mod mesh_collider_station;
 mod object_grabbing;
 mod object_inspector;
@@ -42,6 +43,7 @@ use fixed_joint_station::FixedJointStationPlugin;
 use force_station::ForceStationPlugin;
 use friction_station::FrictionStationPlugin;
 use gravity_controls::GravityControlsPlugin;
+use joint_creation::JointCreationPlugin;
 use mesh_collider_station::MeshColliderStationPlugin;
 use object_grabbing::ObjectGrabbingPlugin;
 use object_inspector::ObjectInspectorPlugin;
@@ -74,6 +76,7 @@ fn main() {
             PlayerPlugin,
             StationLayoutPlugin,
         ))
+        .add_plugins(JointCreationPlugin)
         .add_plugins((
             AxisLocksStationPlugin,
             DensityMassStationPlugin,

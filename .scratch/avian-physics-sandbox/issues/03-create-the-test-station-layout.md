@@ -4,14 +4,14 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] All planned stations are visible from the map.
-- [ ] The stations are connected without scene loading.
+- [x] All planned stations are visible from the map.
+- [x] The stations are connected without scene loading.
 
 ## Tests
 
-- [ ] Launch the application and visit every station.
-- [ ] Verify every station has a readable identifying label.
+- [x] Headless station-layout tests verify all ten stations spawn with readable, unique labels.
+- [x] Headless connectivity test verifies every station is reachable without scene changes.

@@ -12,6 +12,7 @@ mod dynamic_objects;
 mod force_station;
 mod friction_station;
 mod gravity_controls;
+mod mesh_collider_station;
 mod object_grabbing;
 mod object_inspector;
 mod player;
@@ -32,6 +33,7 @@ use dynamic_objects::DynamicObjectsPlugin;
 use force_station::ForceStationPlugin;
 use friction_station::FrictionStationPlugin;
 use gravity_controls::GravityControlsPlugin;
+use mesh_collider_station::MeshColliderStationPlugin;
 use object_grabbing::ObjectGrabbingPlugin;
 use object_inspector::ObjectInspectorPlugin;
 use player::PlayerPlugin;
@@ -65,6 +67,7 @@ fn main() {
             RestitutionStationPlugin,
             RigidBodyStationPlugin,
             ColliderShapeStationPlugin,
+            MeshColliderStationPlugin,
         ))
         .run();
 }

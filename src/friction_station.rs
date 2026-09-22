@@ -132,10 +132,6 @@ fn spawn_friction_lab(
     mut meshes: Option<ResMut<Assets<Mesh>>>,
     mut materials: Option<ResMut<Assets<StandardMaterial>>>,
 ) {
-    let mesh = meshes
-        .as_mut()
-        .map(|meshes| meshes.add(Cuboid::from_length(1.0)));
-
     for kind in FrictionLaneKind::ALL {
         let lane_x = kind.lane_x();
         let friction = Friction::new(kind.coefficient()).with_combine_rule(CoefficientCombine::Max);
@@ -154,11 +150,14 @@ fn spawn_friction_lab(
             ramp_transform,
             Name::new(format!("Friction Lane - {} Ramp", kind.label())),
         ));
-        if let (Some(mesh), Some(material)) = (mesh.as_ref(), color.as_ref()) {
+        if let (Some(meshes), Some(material)) = (meshes.as_mut(), color.as_ref()) {
             ramp.insert((
-                Mesh3d(mesh.clone()),
+                Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(
+                    RAMP_WIDTH,
+                    RAMP_THICKNESS,
+                    RAMP_LENGTH,
+                )))),
                 MeshMaterial3d(material.clone()),
-                ramp_transform.with_scale(Vec3::new(RAMP_WIDTH, RAMP_THICKNESS, RAMP_LENGTH)),
             ));
         }
 
@@ -173,15 +172,14 @@ fn spawn_friction_lab(
             runout_transform,
             Name::new(format!("Friction Lane - {} Runout", kind.label())),
         ));
-        if let (Some(mesh), Some(material)) = (mesh.as_ref(), color.as_ref()) {
+        if let (Some(meshes), Some(material)) = (meshes.as_mut(), color.as_ref()) {
             runout.insert((
-                Mesh3d(mesh.clone()),
-                MeshMaterial3d(material.clone()),
-                runout_transform.with_scale(Vec3::new(
+                Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(
                     RUNOUT_WIDTH,
                     RUNOUT_THICKNESS,
                     RUNOUT_LENGTH,
-                )),
+                )))),
+                MeshMaterial3d(material.clone()),
             ));
         }
 
@@ -209,12 +207,10 @@ fn spawn_friction_lab(
             initial_transform,
             Name::new(format!("Friction Test Object - {}", kind.label())),
         ));
-        if let (Some(mesh), Some(material)) = (mesh.as_ref(), object_color.as_ref()) {
+        if let (Some(meshes), Some(material)) = (meshes.as_mut(), object_color.as_ref()) {
             object.insert((
-                Mesh3d(mesh.clone()),
+                Mesh3d(meshes.add(Cuboid::from_size(Vec3::splat(OBJECT_SIZE)))),
                 MeshMaterial3d(material.clone()),
-                Transform::from_translation(initial_transform.translation)
-                    .with_scale(Vec3::splat(OBJECT_SIZE)),
             ));
         }
     }

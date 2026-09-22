@@ -23,6 +23,7 @@ mod restitution_station;
 mod revolute_joint_station;
 mod rigid_body_station;
 mod scene_collider_station;
+mod spherical_joint_station;
 mod stacking_station;
 mod stations;
 
@@ -50,6 +51,7 @@ use restitution_station::RestitutionStationPlugin;
 use revolute_joint_station::RevoluteJointStationPlugin;
 use rigid_body_station::RigidBodyStationPlugin;
 use scene_collider_station::SceneColliderStationPlugin;
+use spherical_joint_station::SphericalJointStationPlugin;
 use stacking_station::StackingStationPlugin;
 use stations::StationLayoutPlugin;
 
@@ -86,6 +88,7 @@ fn main() {
             DistanceJointStationPlugin,
             RevoluteJointStationPlugin,
             PrismaticJointStationPlugin,
+            SphericalJointStationPlugin,
         ))
         .run();
 }

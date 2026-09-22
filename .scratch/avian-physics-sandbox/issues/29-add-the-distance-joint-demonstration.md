@@ -4,14 +4,14 @@
 
 **Blocked by:** 28
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] The joint has visible endpoints and a configured distance.
-- [ ] The distance remains constrained during motion.
+- [x] The joint has visible endpoints and a configured distance.
+- [x] The distance remains constrained during motion.
 
 ## Tests
 
-- [ ] Pull the objects apart with the player.
-- [ ] Change the distance and verify the constraint updates.
+- [x] Pull the objects apart with the player.
+- [x] Change the distance and verify the constraint updates.

@@ -13,6 +13,7 @@ mod gravity_controls;
 mod object_grabbing;
 mod object_inspector;
 mod player;
+mod restitution_station;
 mod rigid_body_station;
 mod stations;
 
@@ -30,6 +31,7 @@ use gravity_controls::GravityControlsPlugin;
 use object_grabbing::ObjectGrabbingPlugin;
 use object_inspector::ObjectInspectorPlugin;
 use player::PlayerPlugin;
+use restitution_station::RestitutionStationPlugin;
 use rigid_body_station::RigidBodyStationPlugin;
 use stations::StationLayoutPlugin;
 
@@ -55,6 +57,7 @@ fn main() {
         .add_plugins((
             AxisLocksStationPlugin,
             FrictionStationPlugin,
+            RestitutionStationPlugin,
             RigidBodyStationPlugin,
         ))
         .run();

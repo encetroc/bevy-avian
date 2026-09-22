@@ -18,6 +18,7 @@ mod mesh_collider_station;
 mod object_grabbing;
 mod object_inspector;
 mod player;
+mod prismatic_joint_station;
 mod restitution_station;
 mod revolute_joint_station;
 mod rigid_body_station;
@@ -44,6 +45,7 @@ use mesh_collider_station::MeshColliderStationPlugin;
 use object_grabbing::ObjectGrabbingPlugin;
 use object_inspector::ObjectInspectorPlugin;
 use player::PlayerPlugin;
+use prismatic_joint_station::PrismaticJointStationPlugin;
 use restitution_station::RestitutionStationPlugin;
 use revolute_joint_station::RevoluteJointStationPlugin;
 use rigid_body_station::RigidBodyStationPlugin;
@@ -83,6 +85,7 @@ fn main() {
             FixedJointStationPlugin,
             DistanceJointStationPlugin,
             RevoluteJointStationPlugin,
+            PrismaticJointStationPlugin,
         ))
         .run();
 }

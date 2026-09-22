@@ -2,11 +2,13 @@ use avian3d::prelude::*;
 use bevy::prelude::*;
 
 mod camera;
+mod player;
 mod stations;
 
+use camera::CameraFollowPlugin;
 #[cfg(test)]
 use camera::FixedFollowCamera;
-use camera::{CameraFollowPlugin, CameraFollowTarget};
+use player::PlayerPlugin;
 use stations::StationLayoutPlugin;
 
 fn main() {
@@ -17,6 +19,7 @@ fn main() {
             SandboxPlugin,
             CameraFollowPlugin,
             ArenaPlugin,
+            PlayerPlugin,
             StationLayoutPlugin,
         ))
         .run();
@@ -153,7 +156,7 @@ fn spawn_physics_arena(
         Vec3::new(0.0, 5.0, 0.0),
         Vec3::splat(ARENA_TEST_BODY_SIZE),
         RigidBody::Dynamic,
-        Some((ArenaTestBody, CameraFollowTarget)),
+        Some(ArenaTestBody),
         body_visuals,
     );
 }

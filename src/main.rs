@@ -8,6 +8,7 @@ mod cursor_hover;
 mod damping_station;
 mod dynamic_objects;
 mod force_station;
+mod friction_station;
 mod gravity_controls;
 mod object_grabbing;
 mod object_inspector;
@@ -24,6 +25,7 @@ use cursor_hover::CursorHoverPlugin;
 use damping_station::DampingStationPlugin;
 use dynamic_objects::DynamicObjectsPlugin;
 use force_station::ForceStationPlugin;
+use friction_station::FrictionStationPlugin;
 use gravity_controls::GravityControlsPlugin;
 use object_grabbing::ObjectGrabbingPlugin;
 use object_inspector::ObjectInspectorPlugin;
@@ -50,7 +52,11 @@ fn main() {
             PlayerPlugin,
             StationLayoutPlugin,
         ))
-        .add_plugins((AxisLocksStationPlugin, RigidBodyStationPlugin))
+        .add_plugins((
+            AxisLocksStationPlugin,
+            FrictionStationPlugin,
+            RigidBodyStationPlugin,
+        ))
         .run();
 }
 

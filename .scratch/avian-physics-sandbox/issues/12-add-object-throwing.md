@@ -4,14 +4,14 @@
 
 **Blocked by:** 10
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] The throw action releases the object.
-- [ ] Throw strength changes with configured strength and target velocity.
+- [x] The throw action releases the object.
+- [x] Throw strength changes with configured strength and target velocity.
 
 ## Tests
 
-- [ ] Throw objects at low and high speeds.
-- [ ] Verify thrown objects continue colliding after release.
+- [x] Throw objects at low and high speeds.
+- [x] Verify thrown objects continue colliding after release.

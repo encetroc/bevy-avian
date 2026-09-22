@@ -4,14 +4,14 @@
 
 **Blocked by:** 14
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] The station contains visibly different damping configurations.
-- [ ] Linear and angular damping can be changed independently.
+- [x] The station contains visibly different damping configurations.
+- [x] Linear and angular damping can be changed independently.
 
 ## Tests
 
-- [ ] Slide objects with different linear damping.
-- [ ] Spin objects with different angular damping.
+- [x] Slide objects with different linear damping.
+- [x] Spin objects with different angular damping.

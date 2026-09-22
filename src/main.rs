@@ -1,8 +1,10 @@
 use avian3d::prelude::*;
 use bevy::prelude::*;
 
+mod camera;
 mod stations;
 
+use camera::{CameraFollowPlugin, CameraFollowTarget, FixedFollowCamera};
 use stations::StationLayoutPlugin;
 
 fn main() {
@@ -11,6 +13,7 @@ fn main() {
             DefaultPlugins,
             PhysicsPlugins::default(),
             SandboxPlugin,
+            CameraFollowPlugin,
             ArenaPlugin,
             StationLayoutPlugin,
         ))
@@ -59,12 +62,6 @@ impl Plugin for ArenaPlugin {
 }
 
 fn spawn_sandbox_scene(mut commands: Commands) {
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(0.0, 23.0, 25.0).looking_at(Vec3::ZERO, Dir3::Y),
-        Name::new("Sandbox Camera"),
-    ));
-
     commands.spawn((
         DirectionalLight {
             illuminance: 5_000.0,
@@ -154,7 +151,7 @@ fn spawn_physics_arena(
         Vec3::new(0.0, 5.0, 0.0),
         Vec3::splat(ARENA_TEST_BODY_SIZE),
         RigidBody::Dynamic,
-        Some(ArenaTestBody),
+        Some((ArenaTestBody, CameraFollowTarget)),
         body_visuals,
     );
 }
@@ -171,7 +168,7 @@ fn spawn_box(
     position: Vec3,
     size: Vec3,
     body: RigidBody,
-    marker: Option<impl Component>,
+    marker: Option<impl Bundle>,
     visuals: BoxVisuals<'_>,
 ) -> Entity {
     let mut entity = commands.spawn((
@@ -243,11 +240,11 @@ mod tests {
     #[test]
     fn sandbox_plugin_spawns_the_initial_3d_scene() {
         let mut app = App::new();
-        app.add_plugins((MinimalPlugins, SandboxPlugin));
+        app.add_plugins((MinimalPlugins, SandboxPlugin, CameraFollowPlugin));
         app.update();
 
         let world = app.world_mut();
-        let mut cameras = world.query_filtered::<Entity, With<Camera3d>>();
+        let mut cameras = world.query_filtered::<Entity, With<FixedFollowCamera>>();
         assert_eq!(cameras.iter(world).count(), 1);
 
         let mut lights = world.query_filtered::<Entity, With<DirectionalLight>>();

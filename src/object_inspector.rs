@@ -268,7 +268,7 @@ fn update_inspector_ui(
 fn format_inspector_text(object: &InspectorSnapshot) -> String {
     let mass = object
         .mass
-        .map_or_else(|| "infinite/default".to_owned(), |mass| format_float(mass));
+        .map_or_else(|| "infinite/default".to_owned(), format_float);
     let friction = object.friction.as_ref().map_or_else(
         || "default".to_owned(),
         |friction| {

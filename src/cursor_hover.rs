@@ -100,7 +100,7 @@ fn update_cursor_ray(
 /// The predicate is important because the scene contains visible station pads,
 /// paths, and labels that have no physics representation and must not become
 /// selectable merely because their meshes are under the cursor.
-fn update_hover_state(
+pub(crate) fn update_hover_state(
     cursor_ray: Res<CursorRay>,
     spatial_query: SpatialQuery,
     selectable_bodies: Query<(), (With<Collider>, With<RigidBody>)>,

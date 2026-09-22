@@ -5,6 +5,7 @@ mod camera;
 mod collider_debug;
 mod cursor_hover;
 mod dynamic_objects;
+mod object_grabbing;
 mod player;
 mod stations;
 
@@ -14,6 +15,7 @@ use camera::FixedFollowCamera;
 use collider_debug::ColliderDebugPlugin;
 use cursor_hover::CursorHoverPlugin;
 use dynamic_objects::DynamicObjectsPlugin;
+use object_grabbing::ObjectGrabbingPlugin;
 use player::PlayerPlugin;
 use stations::StationLayoutPlugin;
 
@@ -28,6 +30,7 @@ fn main() {
             CameraFollowPlugin,
             ArenaPlugin,
             DynamicObjectsPlugin,
+            ObjectGrabbingPlugin,
             PlayerPlugin,
             StationLayoutPlugin,
         ))

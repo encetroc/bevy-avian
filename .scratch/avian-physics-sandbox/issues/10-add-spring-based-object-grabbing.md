@@ -4,14 +4,14 @@
 
 **Blocked by:** 09
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] Grabbed objects retain physics and collide with the environment.
-- [ ] Objects lag behind rapid cursor movement and release naturally.
+- [x] Grabbed objects retain physics and collide with the environment.
+- [x] Objects lag behind rapid cursor movement and release naturally.
 
 ## Tests
 
-- [ ] Drag a light and heavy object at different speeds.
-- [ ] Move a grabbed object into another body and verify collision response.
+- [x] Drag a light and heavy object at different speeds.
+- [x] Move a grabbed object into another body and verify collision response.

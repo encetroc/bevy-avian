@@ -4,14 +4,14 @@
 
 **Blocked by:** 02, 05
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] Each object falls and collides correctly.
-- [ ] The player can push lightweight objects without becoming unstable.
+- [x] Each object falls and collides correctly.
+- [x] The player can push lightweight objects without becoming unstable.
 
 ## Tests
 
-- [ ] Drop each object onto the floor.
-- [ ] Walk into each object and verify it responds physically.
+- [x] Drop each object onto the floor.
+- [x] Walk into each object and verify it responds physically.

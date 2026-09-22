@@ -97,7 +97,7 @@ const STATIONS: [StationDefinition; 10] = [
     station('A', "Rigid Bodies", Vec3::new(-6.0, 0.0, -6.0)),
     station('B', "Materials", Vec3::new(0.0, 0.0, -6.0)),
     station('C', "Colliders", Vec3::new(6.0, 0.0, -6.0)),
-    station('D', "Forces", Vec3::new(-6.0, 0.0, 0.0)),
+    station('D', "Forces & Damping", Vec3::new(-6.0, 0.0, 0.0)),
     station('E', "Joints", Vec3::new(0.0, 0.0, 0.0)),
     station('F', "Sensors", Vec3::new(6.0, 0.0, 0.0)),
     station('G', "Spatial Queries", Vec3::new(-6.0, 0.0, 6.0)),

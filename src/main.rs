@@ -4,6 +4,7 @@ use bevy::prelude::*;
 mod camera;
 mod collider_debug;
 mod cursor_hover;
+mod damping_station;
 mod dynamic_objects;
 mod force_station;
 mod gravity_controls;
@@ -17,6 +18,7 @@ use camera::CameraFollowPlugin;
 use camera::FixedFollowCamera;
 use collider_debug::ColliderDebugPlugin;
 use cursor_hover::CursorHoverPlugin;
+use damping_station::DampingStationPlugin;
 use dynamic_objects::DynamicObjectsPlugin;
 use force_station::ForceStationPlugin;
 use gravity_controls::GravityControlsPlugin;
@@ -32,6 +34,7 @@ fn main() {
             PhysicsPlugins::default(),
             ColliderDebugPlugin,
             CursorHoverPlugin,
+            DampingStationPlugin,
             ObjectInspectorPlugin,
             SandboxPlugin,
             CameraFollowPlugin,

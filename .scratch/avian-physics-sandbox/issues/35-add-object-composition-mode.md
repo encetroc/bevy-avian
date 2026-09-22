@@ -4,14 +4,14 @@
 
 **Blocked by:** 34
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] A user can select two objects and connect them.
-- [ ] The resulting structure can be pushed, thrown, and inspected as physical objects.
+- [x] A user can select two objects and connect them.
+- [x] The resulting structure can be pushed, thrown, and inspected as physical objects.
 
 ## Tests
 
-- [ ] Compose a plank and two supports.
-- [ ] Verify the composed parts remain connected after collisions.
+- [x] Compose a plank and two supports.
+- [x] Verify the composed parts remain connected after collisions.

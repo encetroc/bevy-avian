@@ -4,14 +4,14 @@
 
 **Blocked by:** 28, 29, 30, 31, 32
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] Joint selection identifies both connected entities and the joint type.
-- [ ] Enable, disable, and delete controls work at runtime.
+- [x] Joint selection identifies both connected entities and the joint type.
+- [x] Enable, disable, and delete controls work at runtime.
 
 ## Tests
 
-- [ ] Inspect every joint type.
-- [ ] Disable, re-enable, and delete selected joints while bodies are active.
+- [x] Inspect every joint type.
+- [x] Disable, re-enable, and delete selected joints while bodies are active.

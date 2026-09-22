@@ -4,14 +4,14 @@
 
 **Blocked by:** 23
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] Scene meshes receive usable colliders without manual per-mesh setup.
-- [ ] Generated colliders preserve the scene hierarchy transforms.
+- [x] Scene meshes receive usable colliders without manual per-mesh setup.
+- [x] Generated colliders preserve the scene hierarchy transforms.
 
 ## Tests
 
-- [ ] Load the scene and inspect all generated colliders.
-- [ ] Drop a body onto each scene mesh.
+- [x] Load the scene and inspect all generated colliders.
+- [x] Drop a body onto each scene mesh.

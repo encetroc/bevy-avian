@@ -53,6 +53,7 @@ impl Plugin for ObjectCompositionPlugin {
                 (
                     handle_composition_keyboard,
                     select_composition_bodies.after(update_hover_reachability),
+                    queue_composition_actions,
                     apply_composition_actions,
                     update_composition_ui,
                 )
@@ -113,6 +114,21 @@ fn select_composition_bodies(
             state.phase = CompositionPhase::Inactive;
         }
         _ => {}
+    }
+}
+
+fn queue_composition_actions(
+    controls: Query<(&Interaction, &CompositionControl), Changed<Interaction>>,
+    mut actions: MessageWriter<CompositionAction>,
+) {
+    for (interaction, control) in &controls {
+        if *interaction == Interaction::Pressed {
+            match control {
+                CompositionControl::Cancel => {
+                    actions.write(CompositionAction::Cancel);
+                }
+            }
+        }
     }
 }
 

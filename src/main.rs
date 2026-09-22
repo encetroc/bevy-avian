@@ -2,6 +2,7 @@ use avian3d::prelude::*;
 use bevy::prelude::*;
 
 mod camera;
+mod collider_debug;
 mod dynamic_objects;
 mod player;
 mod stations;
@@ -9,6 +10,7 @@ mod stations;
 use camera::CameraFollowPlugin;
 #[cfg(test)]
 use camera::FixedFollowCamera;
+use collider_debug::ColliderDebugPlugin;
 use dynamic_objects::DynamicObjectsPlugin;
 use player::PlayerPlugin;
 use stations::StationLayoutPlugin;
@@ -18,6 +20,7 @@ fn main() {
         .add_plugins((
             DefaultPlugins,
             PhysicsPlugins::default(),
+            ColliderDebugPlugin,
             SandboxPlugin,
             CameraFollowPlugin,
             ArenaPlugin,

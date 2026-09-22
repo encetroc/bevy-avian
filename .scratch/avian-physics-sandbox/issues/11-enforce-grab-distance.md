@@ -4,14 +4,14 @@
 
 **Blocked by:** 10
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] Objects inside the radius can be grabbed.
-- [ ] Objects outside the radius show an unreachable state and cannot be grabbed.
+- [x] Objects inside the radius can be grabbed.
+- [x] Objects outside the radius show an unreachable state and cannot be grabbed.
 
 ## Tests
 
-- [ ] Test objects at the radius boundary.
-- [ ] Move the player and verify grab eligibility changes with distance.
+- [x] Test objects at the radius boundary.
+- [x] Move the player and verify grab eligibility changes with distance.

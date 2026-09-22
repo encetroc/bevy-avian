@@ -3,6 +3,7 @@ use bevy::prelude::*;
 
 mod camera;
 mod collider_debug;
+mod cursor_hover;
 mod dynamic_objects;
 mod player;
 mod stations;
@@ -11,6 +12,7 @@ use camera::CameraFollowPlugin;
 #[cfg(test)]
 use camera::FixedFollowCamera;
 use collider_debug::ColliderDebugPlugin;
+use cursor_hover::CursorHoverPlugin;
 use dynamic_objects::DynamicObjectsPlugin;
 use player::PlayerPlugin;
 use stations::StationLayoutPlugin;
@@ -21,6 +23,7 @@ fn main() {
             DefaultPlugins,
             PhysicsPlugins::default(),
             ColliderDebugPlugin,
+            CursorHoverPlugin,
             SandboxPlugin,
             CameraFollowPlugin,
             ArenaPlugin,

@@ -4,14 +4,14 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] The highlighted object follows cursor movement.
-- [ ] Moving off an object clears the hover state.
+- [x] The highlighted object follows cursor movement.
+- [x] Moving off an object clears the hover state.
 
 ## Tests
 
-- [ ] Move the cursor across several objects.
-- [ ] Verify non-physical scenery is not reported as a selectable body.
+- [x] Move the cursor across several objects.
+- [x] Verify non-physical scenery is not reported as a selectable body.

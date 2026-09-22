@@ -4,14 +4,14 @@
 
 **Blocked by:** 28, 29, 30, 31, 32, 33
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] The tool provides a clear two-object selection workflow.
-- [ ] All five joint types can be created between valid bodies.
+- [x] The tool provides a clear two-object selection workflow.
+- [x] All five joint types can be created between valid bodies.
 
 ## Tests
 
-- [ ] Create one of each joint type.
-- [ ] Cancel midway through selection and verify no partial joint remains.
+- [x] Create one of each joint type.
+- [x] Cancel midway through selection and verify no partial joint remains.

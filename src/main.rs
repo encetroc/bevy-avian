@@ -2,12 +2,14 @@ use avian3d::prelude::*;
 use bevy::prelude::*;
 
 mod camera;
+mod dynamic_objects;
 mod player;
 mod stations;
 
 use camera::CameraFollowPlugin;
 #[cfg(test)]
 use camera::FixedFollowCamera;
+use dynamic_objects::DynamicObjectsPlugin;
 use player::PlayerPlugin;
 use stations::StationLayoutPlugin;
 
@@ -19,6 +21,7 @@ fn main() {
             SandboxPlugin,
             CameraFollowPlugin,
             ArenaPlugin,
+            DynamicObjectsPlugin,
             PlayerPlugin,
             StationLayoutPlugin,
         ))

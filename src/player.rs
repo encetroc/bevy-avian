@@ -46,6 +46,10 @@ impl Default for PlayerMovementSettings {
     }
 }
 
+/// Orders systems that move the kinematic player before systems that consume its movement.
+#[derive(SystemSet, Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub struct PlayerMovementSet;
+
 /// Owns player spawning, keyboard input, and collision-aware movement.
 pub struct PlayerPlugin;
 
@@ -60,7 +64,9 @@ impl Plugin for PlayerPlugin {
             // player's position integration and Avian owns collision queries.
             .add_systems(
                 FixedUpdate,
-                (apply_player_movement, move_player_and_slide).chain(),
+                (apply_player_movement, move_player_and_slide)
+                    .chain()
+                    .in_set(PlayerMovementSet),
             )
             .add_systems(Startup, spawn_player);
     }

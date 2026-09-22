@@ -30,6 +30,8 @@ pub struct InspectorSnapshot {
     pub gravity_scale: f32,
     pub linear_damping: f32,
     pub angular_damping: f32,
+    pub locked_axes: u8,
+    pub dominance: i8,
     pub friction: Option<FrictionInfo>,
     pub restitution: Option<f32>,
     pub sleeping: bool,
@@ -113,6 +115,8 @@ fn apply_inspector_edits(
         Option<&mut GravityScale>,
         Option<&mut LinearDamping>,
         Option<&mut AngularDamping>,
+        Option<&mut LockedAxes>,
+        Option<&mut Dominance>,
         Option<&mut LinearVelocity>,
         Option<&mut AngularVelocity>,
     )>,
@@ -127,6 +131,8 @@ fn apply_inspector_edits(
         mut gravity_scale,
         mut linear_damping,
         mut angular_damping,
+        mut locked_axes,
+        mut dominance,
         mut linear_velocity,
         mut angular_velocity,
     )) = properties.get_mut(entity)
@@ -183,6 +189,24 @@ fn apply_inspector_edits(
                             commands.entity(entity).insert(AngularDamping(value));
                         }
                     }
+                    ScalarProperty::Dominance => {
+                        let current = dominance.as_ref().map(|value| value.0).unwrap_or(0);
+                        let value = (current + delta as i8).clamp(-127, 127);
+                        if let Some(dominance) = dominance.as_deref_mut() {
+                            dominance.0 = value;
+                        } else {
+                            commands.entity(entity).insert(Dominance(value));
+                        }
+                    }
+                }
+            }
+            InspectorControl::ToggleAxisLock { kind, axis } => {
+                let current = locked_axes.as_deref().copied().unwrap_or_default();
+                let updated = toggle_axis_lock(current, kind, axis);
+                if let Some(locked_axes) = locked_axes.as_deref_mut() {
+                    *locked_axes = updated;
+                } else {
+                    commands.entity(entity).insert(updated);
                 }
             }
             InspectorControl::Velocity { kind, axis, step } => {
@@ -227,6 +251,7 @@ fn scalar_step(property: ScalarProperty) -> f32 {
         ScalarProperty::Mass => 0.5,
         ScalarProperty::GravityScale => 0.1,
         ScalarProperty::LinearDamping | ScalarProperty::AngularDamping => 0.1,
+        ScalarProperty::Dominance => 1.0,
     }
 }
 
@@ -268,6 +293,8 @@ fn refresh_inspector(
         Option<&GravityScale>,
         Option<&LinearDamping>,
         Option<&AngularDamping>,
+        Option<&LockedAxes>,
+        Option<&Dominance>,
         Option<&Friction>,
         Option<&Restitution>,
         Has<Sleeping>,
@@ -292,6 +319,8 @@ fn refresh_inspector(
             gravity_scale,
             linear_damping,
             angular_damping,
+            locked_axes,
+            dominance,
             friction,
             restitution,
             sleeping,
@@ -334,6 +363,8 @@ fn refresh_inspector(
             gravity_scale: gravity_scale.map(|scale| scale.0).unwrap_or(1.0),
             linear_damping: linear_damping.map(|damping| damping.0).unwrap_or(0.0),
             angular_damping: angular_damping.map(|damping| damping.0).unwrap_or(0.0),
+            locked_axes: locked_axes.map_or(0, LockedAxes::to_bits),
+            dominance: dominance.map(|dominance| dominance.0).unwrap_or(0),
             friction: friction.map(|friction| FrictionInfo {
                 dynamic: friction.dynamic_coefficient,
                 static_coefficient: friction.static_coefficient,
@@ -379,6 +410,10 @@ enum InspectorControl {
         property: ScalarProperty,
         step: StepDirection,
     },
+    ToggleAxisLock {
+        kind: AxisLockKind,
+        axis: Axis,
+    },
     Velocity {
         kind: VelocityKind,
         axis: Axis,
@@ -393,6 +428,13 @@ enum ScalarProperty {
     GravityScale,
     LinearDamping,
     AngularDamping,
+    Dominance,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AxisLockKind {
+    Translation,
+    Rotation,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -422,6 +464,7 @@ struct InspectorValueText {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum InspectorValueProperty {
     Scalar(ScalarProperty),
+    AxisLock(AxisLockKind, Axis),
     Velocity(VelocityKind, Axis),
     Body,
 }
@@ -466,7 +509,13 @@ fn spawn_inspector_ui(mut commands: Commands) {
             spawn_scalar_row(parent, "Gravity scale", ScalarProperty::GravityScale);
             spawn_scalar_row(parent, "Linear damping", ScalarProperty::LinearDamping);
             spawn_scalar_row(parent, "Angular damping", ScalarProperty::AngularDamping);
+            spawn_scalar_row(parent, "Dominance", ScalarProperty::Dominance);
             spawn_body_row(parent);
+            for kind in [AxisLockKind::Translation, AxisLockKind::Rotation] {
+                for axis in [Axis::X, Axis::Y, Axis::Z] {
+                    spawn_axis_lock_row(parent, kind, axis);
+                }
+            }
             for axis in [Axis::X, Axis::Y, Axis::Z] {
                 spawn_velocity_row(parent, VelocityKind::Linear, axis);
             }
@@ -512,6 +561,37 @@ fn spawn_scalar_row(
                 step: StepDirection::Up,
             },
         );
+    });
+}
+
+fn spawn_axis_lock_row(parent: &mut ChildSpawnerCommands, kind: AxisLockKind, axis: Axis) {
+    parent.spawn(control_row_node()).with_children(|row| {
+        row.spawn(control_label(match (kind, axis) {
+            (AxisLockKind::Translation, Axis::X) => "Lock translation X",
+            (AxisLockKind::Translation, Axis::Y) => "Lock translation Y",
+            (AxisLockKind::Translation, Axis::Z) => "Lock translation Z",
+            (AxisLockKind::Rotation, Axis::X) => "Lock rotation X",
+            (AxisLockKind::Rotation, Axis::Y) => "Lock rotation Y",
+            (AxisLockKind::Rotation, Axis::Z) => "Lock rotation Z",
+        }));
+        spawn_control_button(
+            row,
+            "toggle",
+            InspectorControl::ToggleAxisLock { kind, axis },
+        );
+        row.spawn((
+            Text::new("open"),
+            TextFont::from_font_size(14.0),
+            TextColor(PANEL_TEXT),
+            InspectorValueText {
+                property: InspectorValueProperty::AxisLock(kind, axis),
+            },
+            Node {
+                width: px(100.0),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+        ));
     });
 }
 
@@ -677,7 +757,15 @@ fn format_inspector_value(object: &InspectorSnapshot, property: InspectorValuePr
             ScalarProperty::GravityScale => object.gravity_scale,
             ScalarProperty::LinearDamping => object.linear_damping,
             ScalarProperty::AngularDamping => object.angular_damping,
+            ScalarProperty::Dominance => object.dominance as f32,
         }),
+        InspectorValueProperty::AxisLock(kind, axis) => {
+            if axis_is_locked(LockedAxes::from_bits(object.locked_axes), kind, axis) {
+                "locked".to_owned()
+            } else {
+                "open".to_owned()
+            }
+        }
         InspectorValueProperty::Velocity(kind, axis) => {
             let velocity = match kind {
                 VelocityKind::Linear => object.linear_velocity,
@@ -708,7 +796,7 @@ fn format_inspector_text(object: &InspectorSnapshot) -> String {
         .map_or_else(|| "default".to_owned(), format_float);
 
     format!(
-        "{}\nEntity: {:?}\n\nBODY\nType: {:?}\nMass: {}\nGravity scale: {}\nLinear damping: {}\nAngular damping: {}\n\nCOLLIDER\nShape: {}\nScale: {}\nFriction: {}\nRestitution: {}\n\nCURRENT STATE\nPosition: {}\nRotation: {}\nLinear velocity: {}\nAngular velocity: {}\nSleeping: {}\nSleeping disabled: {}",
+        "{}\nEntity: {:?}\n\nBODY\nType: {:?}\nMass: {}\nGravity scale: {}\nLinear damping: {}\nAngular damping: {}\nDominance: {}\nAxis locks: {}\n\nCOLLIDER\nShape: {}\nScale: {}\nFriction: {}\nRestitution: {}\n\nCURRENT STATE\nPosition: {}\nRotation: {}\nLinear velocity: {}\nAngular velocity: {}\nSleeping: {}\nSleeping disabled: {}",
         object.name,
         object.entity,
         object.body,
@@ -716,6 +804,8 @@ fn format_inspector_text(object: &InspectorSnapshot) -> String {
         format_float(object.gravity_scale),
         format_float(object.linear_damping),
         format_float(object.angular_damping),
+        object.dominance,
+        format_axis_locks(LockedAxes::from_bits(object.locked_axes)),
         object.collider.shape,
         format_vec3(object.collider.scale),
         friction,
@@ -731,6 +821,48 @@ fn format_inspector_text(object: &InspectorSnapshot) -> String {
 
 fn format_float(value: f32) -> String {
     format!("{value:.2}")
+}
+
+fn toggle_axis_lock(locked_axes: LockedAxes, kind: AxisLockKind, axis: Axis) -> LockedAxes {
+    let is_locked = axis_is_locked(locked_axes, kind, axis);
+    match (kind, axis, is_locked) {
+        (AxisLockKind::Translation, Axis::X, false) => locked_axes.lock_translation_x(),
+        (AxisLockKind::Translation, Axis::X, true) => locked_axes.unlock_translation_x(),
+        (AxisLockKind::Translation, Axis::Y, false) => locked_axes.lock_translation_y(),
+        (AxisLockKind::Translation, Axis::Y, true) => locked_axes.unlock_translation_y(),
+        (AxisLockKind::Translation, Axis::Z, false) => locked_axes.lock_translation_z(),
+        (AxisLockKind::Translation, Axis::Z, true) => locked_axes.unlock_translation_z(),
+        (AxisLockKind::Rotation, Axis::X, false) => locked_axes.lock_rotation_x(),
+        (AxisLockKind::Rotation, Axis::X, true) => locked_axes.unlock_rotation_x(),
+        (AxisLockKind::Rotation, Axis::Y, false) => locked_axes.lock_rotation_y(),
+        (AxisLockKind::Rotation, Axis::Y, true) => locked_axes.unlock_rotation_y(),
+        (AxisLockKind::Rotation, Axis::Z, false) => locked_axes.lock_rotation_z(),
+        (AxisLockKind::Rotation, Axis::Z, true) => locked_axes.unlock_rotation_z(),
+    }
+}
+
+fn axis_is_locked(locked_axes: LockedAxes, kind: AxisLockKind, axis: Axis) -> bool {
+    match (kind, axis) {
+        (AxisLockKind::Translation, Axis::X) => locked_axes.is_translation_x_locked(),
+        (AxisLockKind::Translation, Axis::Y) => locked_axes.is_translation_y_locked(),
+        (AxisLockKind::Translation, Axis::Z) => locked_axes.is_translation_z_locked(),
+        (AxisLockKind::Rotation, Axis::X) => locked_axes.is_rotation_x_locked(),
+        (AxisLockKind::Rotation, Axis::Y) => locked_axes.is_rotation_y_locked(),
+        (AxisLockKind::Rotation, Axis::Z) => locked_axes.is_rotation_z_locked(),
+    }
+}
+
+fn format_axis_locks(locked_axes: LockedAxes) -> String {
+    let axis = |locked: bool| if locked { "locked" } else { "open" };
+    format!(
+        "T({},{},{}) R({},{},{})",
+        axis(locked_axes.is_translation_x_locked()),
+        axis(locked_axes.is_translation_y_locked()),
+        axis(locked_axes.is_translation_z_locked()),
+        axis(locked_axes.is_rotation_x_locked()),
+        axis(locked_axes.is_rotation_y_locked()),
+        axis(locked_axes.is_rotation_z_locked()),
+    )
 }
 
 fn axis_value(value: Vec3, axis: Axis) -> f32 {
@@ -1045,6 +1177,141 @@ mod tests {
             app.world().entity(body).get::<RigidBody>(),
             Some(&RigidBody::Dynamic)
         );
+    }
+
+    #[test]
+    fn axis_lock_controls_toggle_all_six_axes_and_dominance() {
+        let mut app = inspector_app();
+        let body = editable_body(&mut app, Vec3::ZERO);
+        app.update();
+        select_entity(&mut app, body);
+
+        for (kind, axis) in [
+            (AxisLockKind::Translation, Axis::X),
+            (AxisLockKind::Translation, Axis::Y),
+            (AxisLockKind::Translation, Axis::Z),
+            (AxisLockKind::Rotation, Axis::X),
+            (AxisLockKind::Rotation, Axis::Y),
+            (AxisLockKind::Rotation, Axis::Z),
+        ] {
+            press_control(&mut app, InspectorControl::ToggleAxisLock { kind, axis });
+        }
+
+        let locked_axes = app
+            .world()
+            .entity(body)
+            .get::<LockedAxes>()
+            .copied()
+            .unwrap();
+        assert_eq!(locked_axes.to_bits(), LockedAxes::ALL_LOCKED.to_bits());
+
+        press_control(
+            &mut app,
+            InspectorControl::ToggleAxisLock {
+                kind: AxisLockKind::Rotation,
+                axis: Axis::Y,
+            },
+        );
+        assert!(
+            !app.world()
+                .entity(body)
+                .get::<LockedAxes>()
+                .unwrap()
+                .is_rotation_y_locked()
+        );
+
+        for _ in 0..5 {
+            press_control(
+                &mut app,
+                InspectorControl::Scalar {
+                    property: ScalarProperty::Dominance,
+                    step: StepDirection::Up,
+                },
+            );
+        }
+        assert_eq!(
+            app.world().entity(body).get::<Dominance>(),
+            Some(&Dominance(5))
+        );
+
+        let snapshot = app
+            .world()
+            .resource::<InspectorState>()
+            .object
+            .as_ref()
+            .expect("selected body snapshot");
+        assert_eq!(snapshot.dominance, 5);
+        assert_eq!(
+            snapshot.locked_axes,
+            LockedAxes::ALL_LOCKED.unlock_rotation_y().to_bits()
+        );
+    }
+
+    #[test]
+    fn force_and_torque_respect_each_locked_translation_and_rotation_axis() {
+        let mut app = inspector_app();
+        let bodies = [
+            (LockedAxes::new().lock_translation_x(), Axis::X, true),
+            (LockedAxes::new().lock_translation_y(), Axis::Y, true),
+            (LockedAxes::new().lock_translation_z(), Axis::Z, true),
+            (LockedAxes::new().lock_rotation_x(), Axis::X, false),
+            (LockedAxes::new().lock_rotation_y(), Axis::Y, false),
+            (LockedAxes::new().lock_rotation_z(), Axis::Z, false),
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(index, (locked_axes, axis, translation))| {
+            let position = Vec3::new(index as f32 * 4.0, 0.0, 0.0);
+            let entity = app
+                .world_mut()
+                .spawn((
+                    RigidBody::Dynamic,
+                    Collider::cuboid(0.5, 0.5, 0.5),
+                    Mass(1.0),
+                    GravityScale(0.0),
+                    LinearDamping(0.0),
+                    AngularDamping(0.0),
+                    locked_axes,
+                    ConstantForce(Vec3::splat(10.0)),
+                    ConstantTorque(Vec3::splat(10.0)),
+                    Position(position),
+                    Transform::from_translation(position),
+                ))
+                .id();
+            (entity, axis, translation)
+        })
+        .collect::<Vec<_>>();
+
+        for _ in 0..60 {
+            app.update();
+        }
+
+        for (entity, axis, translation_locked) in bodies {
+            let body = app.world().entity(entity);
+            let velocity = body.get::<LinearVelocity>().unwrap().0;
+            let angular_velocity = body.get::<AngularVelocity>().unwrap().0;
+            let locked_linear = axis_value(velocity, axis);
+            let locked_angular = axis_value(angular_velocity, axis);
+            if translation_locked {
+                assert!(
+                    locked_linear.abs() < 0.01,
+                    "translation lock {axis:?} leaked velocity: {velocity:?}"
+                );
+                assert!(
+                    angular_velocity.length() > 0.1,
+                    "translation lock {axis:?} unexpectedly blocked torque: {angular_velocity:?}"
+                );
+            } else {
+                assert!(
+                    locked_angular.abs() < 0.01,
+                    "rotation lock {axis:?} leaked angular velocity: {angular_velocity:?}"
+                );
+                assert!(
+                    velocity.length() > 0.1,
+                    "rotation lock {axis:?} unexpectedly blocked force: {velocity:?}"
+                );
+            }
+        }
     }
 
     #[test]

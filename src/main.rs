@@ -9,6 +9,7 @@ mod cursor_hover;
 mod damping_station;
 mod density_mass_station;
 mod dynamic_objects;
+mod fixed_joint_station;
 mod force_station;
 mod friction_station;
 mod gravity_controls;
@@ -32,6 +33,7 @@ use cursor_hover::CursorHoverPlugin;
 use damping_station::DampingStationPlugin;
 use density_mass_station::DensityMassStationPlugin;
 use dynamic_objects::DynamicObjectsPlugin;
+use fixed_joint_station::FixedJointStationPlugin;
 use force_station::ForceStationPlugin;
 use friction_station::FrictionStationPlugin;
 use gravity_controls::GravityControlsPlugin;
@@ -74,6 +76,7 @@ fn main() {
             MeshColliderStationPlugin,
             SceneColliderStationPlugin,
             StackingStationPlugin,
+            FixedJointStationPlugin,
         ))
         .run();
 }

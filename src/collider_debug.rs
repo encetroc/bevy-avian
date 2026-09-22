@@ -3,6 +3,8 @@ use bevy::{input::InputSystems, prelude::*};
 
 /// The color used for Avian's collider wireframes when debug rendering is on.
 const COLLIDER_DEBUG_COLOR: Color = Color::srgb(1.0, 0.35, 0.1);
+const JOINT_ANCHOR_DEBUG_COLOR: Color = Color::srgb(1.0, 0.2, 0.75);
+const JOINT_SEPARATION_DEBUG_COLOR: Color = Color::srgb(1.0, 0.1, 0.1);
 
 /// Runtime state for the collider debug rendering toggle.
 #[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -44,6 +46,9 @@ fn toggle_collider_debug(
     settings.enabled = !settings.enabled;
     let (_, physics_gizmos) = gizmo_store.config_mut::<PhysicsGizmos>();
     physics_gizmos.collider_color = settings.enabled.then_some(COLLIDER_DEBUG_COLOR);
+    physics_gizmos.joint_anchor_color = settings.enabled.then_some(JOINT_ANCHOR_DEBUG_COLOR);
+    physics_gizmos.joint_separation_color =
+        settings.enabled.then_some(JOINT_SEPARATION_DEBUG_COLOR);
 }
 
 #[cfg(test)]
@@ -88,12 +93,15 @@ mod tests {
         app.update();
     }
 
-    fn collider_color(app: &App) -> Option<Color> {
+    fn physics_gizmos(app: &App) -> &PhysicsGizmos {
         app.world()
             .resource::<GizmoConfigStore>()
             .config::<PhysicsGizmos>()
             .1
-            .collider_color
+    }
+
+    fn collider_color(app: &App) -> Option<Color> {
+        physics_gizmos(app).collider_color
     }
 
     #[test]
@@ -106,13 +114,10 @@ mod tests {
             &ColliderDebugSettings::default()
         );
         assert_eq!(collider_color(&app), None);
-        assert!(
-            !app.world()
-                .resource::<GizmoConfigStore>()
-                .config::<PhysicsGizmos>()
-                .1
-                .hide_meshes
-        );
+        let gizmos = physics_gizmos(&app);
+        assert_eq!(gizmos.joint_anchor_color, None);
+        assert_eq!(gizmos.joint_separation_color, None);
+        assert!(!gizmos.hide_meshes);
     }
 
     #[test]
@@ -122,16 +127,31 @@ mod tests {
 
         send_f1(&mut app, ButtonState::Pressed);
         assert!(app.world().resource::<ColliderDebugSettings>().enabled);
-        assert_eq!(collider_color(&app), Some(COLLIDER_DEBUG_COLOR));
+        let gizmos = physics_gizmos(&app);
+        assert_eq!(gizmos.collider_color, Some(COLLIDER_DEBUG_COLOR));
+        assert_eq!(gizmos.joint_anchor_color, Some(JOINT_ANCHOR_DEBUG_COLOR));
+        assert_eq!(
+            gizmos.joint_separation_color,
+            Some(JOINT_SEPARATION_DEBUG_COLOR)
+        );
 
         send_f1(&mut app, ButtonState::Released);
         send_f1(&mut app, ButtonState::Pressed);
         assert!(!app.world().resource::<ColliderDebugSettings>().enabled);
-        assert_eq!(collider_color(&app), None);
+        let gizmos = physics_gizmos(&app);
+        assert_eq!(gizmos.collider_color, None);
+        assert_eq!(gizmos.joint_anchor_color, None);
+        assert_eq!(gizmos.joint_separation_color, None);
 
         send_f1(&mut app, ButtonState::Released);
         send_f1(&mut app, ButtonState::Pressed);
         assert!(app.world().resource::<ColliderDebugSettings>().enabled);
-        assert_eq!(collider_color(&app), Some(COLLIDER_DEBUG_COLOR));
+        let gizmos = physics_gizmos(&app);
+        assert_eq!(gizmos.collider_color, Some(COLLIDER_DEBUG_COLOR));
+        assert_eq!(gizmos.joint_anchor_color, Some(JOINT_ANCHOR_DEBUG_COLOR));
+        assert_eq!(
+            gizmos.joint_separation_color,
+            Some(JOINT_SEPARATION_DEBUG_COLOR)
+        );
     }
 }

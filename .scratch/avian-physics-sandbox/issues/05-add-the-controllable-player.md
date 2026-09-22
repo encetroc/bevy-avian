@@ -4,14 +4,14 @@
 
 **Blocked by:** 02, 04
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] WASD moves the player predictably on the ground plane.
-- [ ] The player collides with floors, walls, and static geometry.
+- [x] WASD moves the player predictably on the ground plane.
+- [x] The player collides with floors, walls, and static geometry.
 
 ## Tests
 
-- [ ] Use each movement direction and verify motion.
-- [ ] Push the player against a wall and verify no tunneling or uncontrolled tipping.
+- [x] Use each movement direction and verify motion.
+- [x] Push the player against a wall and verify no tunneling or uncontrolled tipping.

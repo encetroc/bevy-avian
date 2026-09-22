@@ -1,6 +1,7 @@
 use avian3d::prelude::*;
 use bevy::prelude::*;
 
+mod axis_locks_station;
 mod camera;
 mod collider_debug;
 mod cursor_hover;
@@ -13,6 +14,7 @@ mod object_inspector;
 mod player;
 mod stations;
 
+use axis_locks_station::AxisLocksStationPlugin;
 use camera::CameraFollowPlugin;
 #[cfg(test)]
 use camera::FixedFollowCamera;
@@ -46,6 +48,7 @@ fn main() {
             PlayerPlugin,
             StationLayoutPlugin,
         ))
+        .add_plugins(AxisLocksStationPlugin)
         .run();
 }
 

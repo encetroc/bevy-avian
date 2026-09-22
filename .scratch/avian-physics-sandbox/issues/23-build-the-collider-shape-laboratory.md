@@ -4,14 +4,14 @@
 
 **Blocked by:** 08
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] Every required primitive shape is represented.
-- [ ] Collider debug rendering distinguishes mesh and collider geometry.
+- [x] Every required primitive shape is represented.
+- [x] Collider debug rendering distinguishes mesh and collider geometry.
 
 ## Tests
 
-- [ ] Toggle F1 and inspect every example.
-- [ ] Drop objects onto each shape and verify collision behavior.
+- [x] Toggle F1 and inspect every example.
+- [x] Drop objects onto each shape and verify collision behavior.

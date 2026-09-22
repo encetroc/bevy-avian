@@ -6,6 +6,7 @@ mod camera;
 mod collider_debug;
 mod cursor_hover;
 mod damping_station;
+mod density_mass_station;
 mod dynamic_objects;
 mod force_station;
 mod friction_station;
@@ -24,6 +25,7 @@ use camera::FixedFollowCamera;
 use collider_debug::ColliderDebugPlugin;
 use cursor_hover::CursorHoverPlugin;
 use damping_station::DampingStationPlugin;
+use density_mass_station::DensityMassStationPlugin;
 use dynamic_objects::DynamicObjectsPlugin;
 use force_station::ForceStationPlugin;
 use friction_station::FrictionStationPlugin;
@@ -56,6 +58,7 @@ fn main() {
         ))
         .add_plugins((
             AxisLocksStationPlugin,
+            DensityMassStationPlugin,
             FrictionStationPlugin,
             RestitutionStationPlugin,
             RigidBodyStationPlugin,

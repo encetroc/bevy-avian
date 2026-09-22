@@ -4,14 +4,14 @@
 
 **Blocked by:** 06, 07
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] Users can freely place and stack the provided objects.
-- [ ] The area makes jitter, tipping, sliding, sleeping, and performance observable.
+- [x] Users can freely place and stack the provided objects.
+- [x] The area makes jitter, tipping, sliding, sleeping, and performance observable.
 
 ## Tests
 
-- [ ] Build a small stack and disturb it.
-- [ ] Leave a stack at rest and verify bodies can sleep.
+- [x] Build a small stack and disturb it.
+- [x] Leave a stack at rest and verify bodies can sleep.

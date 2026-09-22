@@ -1484,34 +1484,42 @@ fn spawn_control_button(
 #[allow(clippy::type_complexity)]
 fn update_inspector_ui(
     inspector: Res<InspectorState>,
-    mut panel: Query<&mut Node, With<InspectorPanel>>,
-    mut body_sections: Query<&mut Node, With<InspectorBodySection>>,
-    mut joint_sections: Query<&mut Node, With<InspectorJointSection>>,
+    mut nodes: ParamSet<(
+        Query<&mut Node, With<InspectorPanel>>,
+        Query<&mut Node, With<InspectorBodySection>>,
+        Query<&mut Node, With<InspectorJointSection>>,
+    )>,
     mut texts: ParamSet<(
         Query<&mut Text, With<InspectorText>>,
         Query<(&InspectorValueText, &mut Text)>,
     )>,
     mut buttons: Query<(&Interaction, &mut BackgroundColor), With<InspectorControl>>,
 ) {
-    let Ok(mut panel) = panel.single_mut() else {
-        return;
-    };
-    if inspector.object.is_none() && inspector.joint.is_none() {
-        panel.display = Display::None;
+    let has_selection = inspector.object.is_some() || inspector.joint.is_some();
+    {
+        let mut panels = nodes.p0();
+        let Ok(mut panel) = panels.single_mut() else {
+            return;
+        };
+        panel.display = if has_selection {
+            Display::Flex
+        } else {
+            Display::None
+        };
+    }
+    if !has_selection {
         if let Ok(mut summary_text) = texts.p0().single_mut() {
             summary_text.0.clear();
         }
         return;
     }
-
-    panel.display = Display::Flex;
-    for mut section in &mut body_sections {
+    for mut section in &mut nodes.p1() {
         section.display = inspector
             .object
             .as_ref()
             .map_or(Display::None, |_| Display::Flex);
     }
-    for mut section in &mut joint_sections {
+    for mut section in &mut nodes.p2() {
         section.display = inspector
             .joint
             .as_ref()
@@ -2288,6 +2296,208 @@ mod tests {
             light_velocity > heavy_velocity * 2.0,
             "mass edit did not reduce force response: light={light_velocity}, heavy={heavy_velocity}"
         );
+    }
+
+    fn spawn_joint_bodies(app: &mut App, z: f32) -> [Entity; 2] {
+        [
+            spawn_body(
+                app,
+                "Joint Body 1",
+                RigidBody::Dynamic,
+                Vec3::new(-1.0, 0.0, z),
+            ),
+            spawn_body(
+                app,
+                "Joint Body 2",
+                RigidBody::Dynamic,
+                Vec3::new(1.0, 0.0, z),
+            ),
+        ]
+    }
+
+    fn spawn_inspectable_joint(app: &mut App, joint_type: JointType, z: f32) -> Entity {
+        let [body1, body2] = spawn_joint_bodies(app, z);
+        let anchor1 = Vec3::X * 0.5;
+        let anchor2 = Vec3::NEG_X * 0.5;
+        let mut entity = app.world_mut().spawn_empty();
+        match joint_type {
+            JointType::Fixed => {
+                entity.insert(
+                    FixedJoint::new(body1, body2)
+                        .with_local_anchor1(anchor1)
+                        .with_local_anchor2(anchor2),
+                );
+            }
+            JointType::Distance => {
+                entity.insert(
+                    DistanceJoint::new(body1, body2)
+                        .with_local_anchor1(anchor1)
+                        .with_local_anchor2(anchor2),
+                );
+            }
+            JointType::Revolute => {
+                entity.insert(
+                    RevoluteJoint::new(body1, body2)
+                        .with_local_anchor1(anchor1)
+                        .with_local_anchor2(anchor2),
+                );
+            }
+            JointType::Prismatic => {
+                entity.insert(
+                    PrismaticJoint::new(body1, body2)
+                        .with_local_anchor1(anchor1)
+                        .with_local_anchor2(anchor2),
+                );
+            }
+            JointType::Spherical => {
+                entity.insert(
+                    SphericalJoint::new(body1, body2)
+                        .with_local_anchor1(anchor1)
+                        .with_local_anchor2(anchor2),
+                );
+            }
+        }
+        entity
+            .insert((
+                JointForces::new(),
+                JointDamping {
+                    linear: 0.2,
+                    angular: 0.3,
+                },
+                Name::new(format!("{joint_type:?} inspection joint")),
+            ))
+            .id()
+    }
+
+    #[test]
+    fn clicking_a_joint_anchor_selects_and_identifies_every_joint_type() {
+        let mut app = inspector_app();
+        let joint = spawn_inspectable_joint(&mut app, JointType::Fixed, -5.0);
+        app.update();
+
+        point_cursor_at(&mut app, Vec3::new(0.0, 0.0, -5.0));
+        click_left(&mut app);
+        assert_eq!(app.world().resource::<SelectionState>().entity, Some(joint));
+        let selected = app
+            .world()
+            .resource::<InspectorState>()
+            .joint
+            .as_ref()
+            .expect("selected joint");
+        assert_eq!(selected.joint_type, JointType::Fixed);
+        assert_eq!(selected.body1_name, "Joint Body 1");
+        assert_eq!(selected.body2_name, "Joint Body 2");
+        assert_eq!(selected.anchor1, Some(Vec3::X * 0.5));
+        assert_eq!(selected.anchor2, Some(Vec3::NEG_X * 0.5));
+        assert!(inspector_text(&mut app).contains("Type: Fixed"));
+
+        for (index, joint_type) in [
+            JointType::Fixed,
+            JointType::Distance,
+            JointType::Revolute,
+            JointType::Prismatic,
+            JointType::Spherical,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let joint = if index == 0 {
+                joint
+            } else {
+                spawn_inspectable_joint(&mut app, joint_type, -10.0 - index as f32)
+            };
+            select_entity(&mut app, joint);
+            assert_eq!(
+                app.world()
+                    .resource::<InspectorState>()
+                    .joint
+                    .as_ref()
+                    .expect("joint snapshot")
+                    .joint_type,
+                joint_type
+            );
+        }
+    }
+
+    #[test]
+    fn joint_controls_edit_configuration_stress_and_lifecycle_while_bodies_are_active() {
+        let mut app = inspector_app();
+        let joint = spawn_inspectable_joint(&mut app, JointType::Fixed, -5.0);
+        app.update();
+        select_entity(&mut app, joint);
+
+        let snapshot = app
+            .world()
+            .resource::<InspectorState>()
+            .joint
+            .as_ref()
+            .expect("joint snapshot");
+        let stress = snapshot.stress.expect("joint stress output");
+        assert!(stress.force.is_finite());
+        assert!(stress.torque.is_finite());
+        assert!(stress.motor_force.is_finite());
+        assert_eq!(snapshot.damping.linear, 0.2);
+
+        press_control(
+            &mut app,
+            InspectorControl::JointAnchor {
+                body: JointBody::First,
+                axis: Axis::Y,
+                step: StepDirection::Up,
+            },
+        );
+        press_control(
+            &mut app,
+            InspectorControl::JointCompliance {
+                property: JointComplianceProperty::Point,
+                step: StepDirection::Up,
+            },
+        );
+        press_control(
+            &mut app,
+            InspectorControl::JointDamping {
+                kind: JointDampingKind::Linear,
+                step: StepDirection::Up,
+            },
+        );
+
+        let fixed = app.world().entity(joint).get::<FixedJoint>().unwrap();
+        assert_eq!(fixed.local_anchor1(), Some(Vec3::new(0.5, 0.1, 0.0)));
+        assert_eq!(fixed.point_compliance, 0.001);
+        assert_eq!(
+            app.world()
+                .entity(joint)
+                .get::<JointDamping>()
+                .unwrap()
+                .linear,
+            0.3
+        );
+
+        press_control(&mut app, InspectorControl::ToggleJointEnabled);
+        assert!(app.world().entity(joint).contains::<JointDisabled>());
+        assert!(
+            !app.world()
+                .resource::<InspectorState>()
+                .joint
+                .as_ref()
+                .unwrap()
+                .enabled
+        );
+        press_control(&mut app, InspectorControl::ToggleJointEnabled);
+        assert!(!app.world().entity(joint).contains::<JointDisabled>());
+        assert!(
+            app.world()
+                .resource::<InspectorState>()
+                .joint
+                .as_ref()
+                .unwrap()
+                .enabled
+        );
+
+        press_control(&mut app, InspectorControl::DeleteJoint);
+        assert!(app.world().get_entity(joint).is_err());
+        assert_eq!(app.world().resource::<SelectionState>().entity, None);
+        assert_eq!(app.world().resource::<InspectorState>().joint, None);
     }
 
     #[test]

@@ -48,7 +48,6 @@ pub enum SphericalJointAction {
     AngularImpulseX,
     AngularImpulseY,
     AngularImpulseZ,
-    Reset,
 }
 
 /// Owns the hanging-object spherical-joint demonstration in station E.
@@ -67,7 +66,6 @@ impl Plugin for SphericalJointStationPlugin {
                 (
                     queue_spherical_joint_station_actions,
                     update_spherical_joint_button_colors,
-                    reset_spherical_joint_station,
                 )
                     .chain(),
             )
@@ -311,23 +309,10 @@ fn apply_spherical_joint_station_actions(
             SphericalJointAction::AngularImpulseX => Vec3::X * ANGULAR_IMPULSE,
             SphericalJointAction::AngularImpulseY => Vec3::Y * ANGULAR_IMPULSE,
             SphericalJointAction::AngularImpulseZ => Vec3::Z * ANGULAR_IMPULSE,
-            SphericalJointAction::Reset => continue,
         };
         for mut forces in &mut objects {
             forces.apply_angular_impulse(impulse);
         }
-    }
-}
-
-fn reset_spherical_joint_station(
-    mut actions: MessageReader<SphericalJointStationAction>,
-    mut resets: MessageWriter<ResetStation>,
-) {
-    if actions
-        .read()
-        .any(|action| action.action == SphericalJointAction::Reset)
-    {
-        resets.write(ResetStation { code: STATION_CODE });
     }
 }
 

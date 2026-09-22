@@ -4,14 +4,14 @@
 
 **Blocked by:** 23
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] The irregular object receives a collider at runtime or load time.
-- [ ] Bodies can fall and slide over its irregular surface.
+- [x] The irregular object receives a collider at runtime or load time.
+- [x] Bodies can fall and slide over its irregular surface.
 
 ## Tests
 
-- [ ] Enable collider debug rendering and inspect the generated shape.
-- [ ] Drop objects on multiple parts of the mesh.
+- [x] Enable collider debug rendering and inspect the generated shape.
+- [x] Drop objects on multiple parts of the mesh.

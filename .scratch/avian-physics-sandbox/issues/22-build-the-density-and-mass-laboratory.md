@@ -4,14 +4,14 @@
 
 **Blocked by:** 14, 19
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] The objects appear visually equivalent.
-- [ ] Their push and grab responses are noticeably different.
+- [x] The objects appear visually equivalent.
+- [x] Their push and grab responses are noticeably different.
 
 ## Tests
 
-- [ ] Push each object with the player.
-- [ ] Grab and drag each object and compare lag.
+- [x] Push each object with the player.
+- [x] Grab and drag each object and compare lag.

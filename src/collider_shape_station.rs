@@ -255,6 +255,7 @@ fn draw_collider_shape_labels(
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn reset_collider_shape_lab(
     mut requests: MessageReader<ResetStation>,
     mut drops: Query<

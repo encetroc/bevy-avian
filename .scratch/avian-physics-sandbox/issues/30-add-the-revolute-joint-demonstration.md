@@ -4,14 +4,14 @@
 
 **Blocked by:** 28
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] Rotation is constrained around the intended hinge axis.
-- [ ] The hinge remains connected during pushes and impacts.
+- [x] Rotation is constrained around the intended hinge axis.
+- [x] The hinge remains connected during pushes and impacts.
 
 ## Tests
 
-- [ ] Push the door from multiple directions.
-- [ ] Inspect its rotation axis with debug rendering.
+- [x] Push the door from multiple directions.
+- [x] Inspect its rotation axis with debug rendering.

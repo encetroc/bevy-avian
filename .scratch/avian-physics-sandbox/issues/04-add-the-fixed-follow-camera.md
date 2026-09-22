@@ -4,14 +4,14 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] The camera remains top-down/isometric and keeps the player visible.
-- [ ] Camera following uses smooth positional movement.
+- [x] The camera remains top-down/isometric and keeps the player visible.
+- [x] Camera following uses smooth positional movement.
 
 ## Tests
 
-- [ ] Move across the arena and verify the camera follows.
-- [ ] Verify the camera orientation remains fixed during normal movement.
+- [x] Headless camera tests verify smooth horizontal following across the arena plane.
+- [x] Headless camera tests verify the orientation remains fixed while the target moves.

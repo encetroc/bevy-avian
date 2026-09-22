@@ -4,14 +4,14 @@
 
 **Blocked by:** 14
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] Each translation and rotation axis can be locked.
-- [ ] Dominance-labelled bodies produce different collision outcomes where supported.
+- [x] Each translation and rotation axis can be locked.
+- [x] Dominance-labelled bodies produce different collision outcomes where supported.
 
 ## Tests
 
-- [ ] Apply force to each locked-axis body.
-- [ ] Collide bodies with different dominance values and inspect the result.
+- [x] Apply force to each locked-axis body.
+- [x] Collide bodies with different dominance values and inspect the result.

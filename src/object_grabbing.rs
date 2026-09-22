@@ -33,12 +33,27 @@ pub struct GrabState {
     pub grab: Option<GrabTarget>,
 }
 
+/// Tunable settings for converting grab-target movement into a throw.
+#[derive(Resource, Clone, Copy, Debug, PartialEq)]
+pub struct ThrowSettings {
+    /// Multiplier applied to the recent grab-target velocity on throw.
+    pub strength: f32,
+}
+
+impl Default for ThrowSettings {
+    fn default() -> Self {
+        Self { strength: 1.0 }
+    }
+}
+
 /// The target tracked by the spring while a body is held.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GrabTarget {
     pub entity: Entity,
     pub target: Vec3,
     pub distance: f32,
+    /// The latest world-space velocity of the spring target.
+    pub target_velocity: Vec3,
     cursor_offset: Vec3,
 }
 
@@ -55,6 +70,7 @@ impl Plugin for ObjectGrabbingPlugin {
             .init_resource::<HoverState>()
             .init_resource::<GrabDistanceSettings>()
             .init_resource::<SpringGrabSettings>()
+            .init_resource::<ThrowSettings>()
             .init_resource::<GrabState>()
             .add_systems(
                 Update,
@@ -67,11 +83,22 @@ impl Plugin for ObjectGrabbingPlugin {
 #[derive(SystemParam)]
 struct GrabInput<'w, 's> {
     mouse: Res<'w, ButtonInput<MouseButton>>,
+    keyboard: Res<'w, ButtonInput<KeyCode>>,
     cursor_ray: Res<'w, CursorRay>,
     hover: Res<'w, HoverState>,
     settings: Res<'w, GrabDistanceSettings>,
+    throw_settings: Res<'w, ThrowSettings>,
+    time: Res<'w, Time>,
     players: Query<'w, 's, &'static Position, With<Player>>,
-    bodies: Query<'w, 's, (&'static Position, &'static RigidBody)>,
+    bodies: Query<
+        'w,
+        's,
+        (
+            &'static Position,
+            &'static RigidBody,
+            Option<&'static LinearVelocity>,
+        ),
+    >,
 }
 
 fn handle_grab_input(input: GrabInput, mut state: ResMut<GrabState>, mut commands: Commands) {
@@ -84,7 +111,7 @@ fn handle_grab_input(input: GrabInput, mut state: ResMut<GrabState>, mut command
         let Some(ray) = input.cursor_ray.ray else {
             return;
         };
-        let Ok((position, body)) = input.bodies.get(hover.entity) else {
+        let Ok((position, body, _)) = input.bodies.get(hover.entity) else {
             return;
         };
         if *body != RigidBody::Dynamic || hover.reachability != HoverReachability::Reachable {
@@ -97,6 +124,7 @@ fn handle_grab_input(input: GrabInput, mut state: ResMut<GrabState>, mut command
             entity: hover.entity,
             target: position.0,
             distance: hover.distance,
+            target_velocity: Vec3::ZERO,
             cursor_offset,
         });
         commands
@@ -109,7 +137,7 @@ fn handle_grab_input(input: GrabInput, mut state: ResMut<GrabState>, mut command
     };
 
     if let Some(player) = input.players.iter().next() {
-        let Ok((position, _)) = input.bodies.get(active_grab.entity) else {
+        let Ok((position, _, _)) = input.bodies.get(active_grab.entity) else {
             release_grab(&mut state, &mut commands);
             return;
         };
@@ -124,13 +152,52 @@ fn handle_grab_input(input: GrabInput, mut state: ResMut<GrabState>, mut command
         return;
     }
 
+    let delta_secs = input.time.delta_secs();
     let Some(grab) = state.grab.as_mut() else {
         return;
     };
     if let Some(ray) = input.cursor_ray.ray {
         let target_on_ray = ray.origin + ray.direction * grab.distance;
-        grab.target = target_on_ray + grab.cursor_offset;
+        let next_target = target_on_ray + grab.cursor_offset;
+        grab.target_velocity = if delta_secs.is_finite() && delta_secs > 0.0 {
+            (next_target - grab.target) / delta_secs
+        } else {
+            Vec3::ZERO
+        };
+        grab.target = next_target;
+    } else {
+        grab.target_velocity = Vec3::ZERO;
     }
+
+    let throw_requested = input.mouse.just_pressed(MouseButton::Right)
+        || input.keyboard.just_pressed(KeyCode::Space)
+        // ButtonInput::press is a useful headless seam and represents a held
+        // Space action even when no raw keyboard message was delivered.
+        || input.keyboard.pressed(KeyCode::Space);
+    if !throw_requested {
+        return;
+    }
+
+    let target_velocity = grab.target_velocity;
+    let current_velocity = input
+        .bodies
+        .get(active_grab.entity)
+        .ok()
+        .and_then(|(_, _, velocity)| velocity.map(|velocity| velocity.0))
+        .unwrap_or(Vec3::ZERO);
+    let throw_strength = input.throw_settings.strength;
+    let throw_velocity = if throw_strength.is_finite() {
+        target_velocity * throw_strength.max(0.0)
+    } else {
+        Vec3::ZERO
+    };
+
+    // Add the target's recent motion to the body's existing spring momentum,
+    // then remove the spring so the body remains a normal dynamic collider.
+    commands
+        .entity(active_grab.entity)
+        .insert(LinearVelocity(current_velocity + throw_velocity));
+    release_grab(&mut state, &mut commands);
 }
 
 fn release_grab(state: &mut GrabState, commands: &mut Commands) {
@@ -257,15 +324,19 @@ mod tests {
         app.update();
     }
 
-    fn send_mouse_button(app: &mut App, state: ButtonState) {
+    fn send_mouse_button_for(app: &mut App, button: MouseButton, state: ButtonState) {
         app.world_mut()
             .resource_mut::<Messages<MouseButtonInput>>()
             .write(MouseButtonInput {
-                button: MouseButton::Left,
+                button,
                 state,
                 window: Entity::PLACEHOLDER,
             });
         app.update();
+    }
+
+    fn send_mouse_button(app: &mut App, state: ButtonState) {
+        send_mouse_button_for(app, MouseButton::Left, state);
     }
 
     fn run_steps(app: &mut App, steps: usize) {
@@ -452,6 +523,119 @@ mod tests {
         run_steps(&mut app, 1);
         let velocity_after_release = app.world().entity(body).get::<LinearVelocity>().unwrap().0;
         assert!(velocity_after_release.x > 0.0);
+    }
+
+    fn throw_body_with_target_motion(strength: f32, target: Vec3) -> (Vec3, Vec3) {
+        let mut app = grabbing_app();
+        app.world_mut().resource_mut::<ThrowSettings>().strength = strength;
+        let body = spawn_body(&mut app, Vec3::new(0.0, 0.0, -5.0), 1.0);
+        point_cursor_at(&mut app, Vec3::new(0.0, 0.0, -5.0));
+        send_mouse_button(&mut app, ButtonState::Pressed);
+
+        app.world_mut().resource_mut::<CursorRay>().set(
+            Vec3::ZERO,
+            Dir3::new(target.normalize()).expect("throw target direction"),
+        );
+        app.update();
+        let target_velocity = app
+            .world()
+            .resource::<GrabState>()
+            .grab
+            .expect("active grab before throw")
+            .target_velocity;
+
+        send_mouse_button_for(&mut app, MouseButton::Right, ButtonState::Pressed);
+        let velocity = app.world().entity(body).get::<LinearVelocity>().unwrap().0;
+        assert!(app.world().resource::<GrabState>().grab.is_none());
+        assert!(!app.world().entity(body).contains::<SpringGrabbed>());
+        assert!(!app.world().entity(body).contains::<ConstantForce>());
+        (target_velocity, velocity)
+    }
+
+    #[test]
+    fn right_click_throw_releases_the_body_and_preserves_target_momentum() {
+        let (target_velocity, throw_velocity) =
+            throw_body_with_target_motion(1.0, Vec3::new(1.0, 0.0, -5.0));
+
+        assert!(
+            target_velocity.x > 1.0,
+            "target did not move: {target_velocity:?}"
+        );
+        assert!(
+            throw_velocity.x > 1.0,
+            "throw did not preserve forward momentum: {throw_velocity:?} / {target_velocity:?}"
+        );
+    }
+
+    #[test]
+    fn configured_throw_strength_scales_low_and_high_target_speeds() {
+        let (low_target_velocity, low_throw_velocity) =
+            throw_body_with_target_motion(0.5, Vec3::new(0.5, 0.0, -5.0));
+        let (high_target_velocity, high_throw_velocity) =
+            throw_body_with_target_motion(2.0, Vec3::new(2.0, 0.0, -5.0));
+
+        assert!(low_target_velocity.x > 0.0);
+        assert!(high_target_velocity.x > low_target_velocity.x);
+        assert!(high_throw_velocity.x > low_throw_velocity.x);
+        assert!(
+            high_throw_velocity.x - low_throw_velocity.x > 0.1,
+            "throw strength and target speed had no measurable effect: {low_throw_velocity:?} / {high_throw_velocity:?}"
+        );
+    }
+
+    #[test]
+    fn thrown_body_keeps_colliding_with_a_wall_after_release() {
+        let mut app = grabbing_app();
+        app.world_mut().resource_mut::<ThrowSettings>().strength = 0.05;
+        spawn_floor(&mut app);
+        let body = spawn_body(&mut app, Vec3::new(-3.0, 0.0, -5.0), 2.0);
+        let wall = spawn_wall(&mut app, Vec3::new(-1.0, 0.0, -5.0));
+        point_cursor_at(&mut app, Vec3::new(-3.0, 0.0, -5.0));
+        send_mouse_button(&mut app, ButtonState::Pressed);
+        app.world_mut().resource_mut::<CursorRay>().set(
+            Vec3::ZERO,
+            Dir3::new(Vec3::new(10.0, 0.0, -5.0).normalize()).unwrap(),
+        );
+        app.update();
+        send_mouse_button_for(&mut app, MouseButton::Right, ButtonState::Pressed);
+
+        assert!(app.world().resource::<GrabState>().grab.is_none());
+        assert!(!app.world().entity(body).contains::<ConstantForce>());
+
+        let mut collided = false;
+        for _ in 0..180 {
+            app.update();
+            if app.world().resource::<ContactGraph>().contains(body, wall) {
+                collided = true;
+                break;
+            }
+        }
+
+        assert!(
+            collided,
+            "thrown body did not collide after release: {:?}",
+            position(&app, body)
+        );
+        assert_eq!(
+            app.world().entity(body).get::<RigidBody>(),
+            Some(&RigidBody::Dynamic)
+        );
+    }
+
+    #[test]
+    fn space_throw_action_releases_the_body() {
+        let mut app = grabbing_app();
+        let body = spawn_body(&mut app, Vec3::new(0.0, 0.0, -5.0), 1.0);
+        point_cursor_at(&mut app, Vec3::new(0.0, 0.0, -5.0));
+        send_mouse_button(&mut app, ButtonState::Pressed);
+
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::Space);
+        app.update();
+
+        assert!(app.world().resource::<GrabState>().grab.is_none());
+        assert!(!app.world().entity(body).contains::<SpringGrabbed>());
     }
 
     #[test]

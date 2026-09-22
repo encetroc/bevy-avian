@@ -4,14 +4,14 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] A dynamic test body falls under gravity.
-- [ ] The body collides with the floor and cannot leave the arena.
+- [x] A dynamic test body falls under gravity.
+- [x] The body collides with the floor and cannot leave the arena.
 
 ## Tests
 
-- [ ] Run the application and observe a body settle on the floor.
-- [ ] Walk or move the test body into each wall and verify containment.
+- [x] Run the application and observe a body settle on the floor.
+- [x] Walk or move the test body into each wall and verify containment.

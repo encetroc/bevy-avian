@@ -1,7 +1,10 @@
 use avian3d::prelude::*;
-use bevy::prelude::*;
+use bevy::{ecs::system::SystemParam, prelude::*};
 
-use crate::cursor_hover::{CursorRay, HoverState};
+use crate::cursor_hover::{
+    CursorRay, GrabDistanceSettings, HoverReachability, HoverState, is_within_grab_distance,
+};
+use crate::player::Player;
 
 /// Spring parameters used while a dynamic body is being dragged.
 #[derive(Resource, Clone, Copy, Debug, PartialEq)]
@@ -50,37 +53,41 @@ impl Plugin for ObjectGrabbingPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CursorRay>()
             .init_resource::<HoverState>()
+            .init_resource::<GrabDistanceSettings>()
             .init_resource::<SpringGrabSettings>()
             .init_resource::<GrabState>()
             .add_systems(
                 Update,
-                handle_grab_input.after(crate::cursor_hover::update_hover_state),
+                handle_grab_input.after(crate::cursor_hover::update_hover_reachability),
             )
             .add_systems(FixedUpdate, apply_spring_force);
     }
 }
 
-fn handle_grab_input(
-    mouse: Res<ButtonInput<MouseButton>>,
-    cursor_ray: Res<CursorRay>,
-    hover: Res<HoverState>,
-    bodies: Query<(&Position, &RigidBody)>,
-    mut state: ResMut<GrabState>,
-    mut commands: Commands,
-) {
-    if mouse.just_pressed(MouseButton::Left) {
+#[derive(SystemParam)]
+struct GrabInput<'w, 's> {
+    mouse: Res<'w, ButtonInput<MouseButton>>,
+    cursor_ray: Res<'w, CursorRay>,
+    hover: Res<'w, HoverState>,
+    settings: Res<'w, GrabDistanceSettings>,
+    players: Query<'w, 's, &'static Position, With<Player>>,
+    bodies: Query<'w, 's, (&'static Position, &'static RigidBody)>,
+}
+
+fn handle_grab_input(input: GrabInput, mut state: ResMut<GrabState>, mut commands: Commands) {
+    if input.mouse.just_pressed(MouseButton::Left) {
         release_grab(&mut state, &mut commands);
 
-        let Some(hover) = hover.object.as_ref() else {
+        let Some(hover) = input.hover.object.as_ref() else {
             return;
         };
-        let Some(ray) = cursor_ray.ray else {
+        let Some(ray) = input.cursor_ray.ray else {
             return;
         };
-        let Ok((position, body)) = bodies.get(hover.entity) else {
+        let Ok((position, body)) = input.bodies.get(hover.entity) else {
             return;
         };
-        if *body != RigidBody::Dynamic {
+        if *body != RigidBody::Dynamic || hover.reachability != HoverReachability::Reachable {
             return;
         }
 
@@ -97,16 +104,30 @@ fn handle_grab_input(
             .insert((SpringGrabbed, ConstantForce::default()));
     }
 
-    let Some(grab) = state.grab.as_mut() else {
+    let Some(active_grab) = state.grab else {
         return;
     };
 
-    if !mouse.pressed(MouseButton::Left) {
+    if let Some(player) = input.players.iter().next() {
+        let Ok((position, _)) = input.bodies.get(active_grab.entity) else {
+            release_grab(&mut state, &mut commands);
+            return;
+        };
+        if !is_within_grab_distance(player.0, position.0, input.settings.max_distance) {
+            release_grab(&mut state, &mut commands);
+            return;
+        }
+    }
+
+    if !input.mouse.pressed(MouseButton::Left) {
         release_grab(&mut state, &mut commands);
         return;
     }
 
-    if let Some(ray) = cursor_ray.ray {
+    let Some(grab) = state.grab.as_mut() else {
+        return;
+    };
+    if let Some(ray) = input.cursor_ray.ray {
         let target_on_ray = ray.origin + ray.direction * grab.distance;
         grab.target = target_on_ray + grab.cursor_offset;
     }
@@ -168,12 +189,29 @@ mod tests {
             CursorHoverPlugin,
             ObjectGrabbingPlugin,
         ))
+        .add_systems(Startup, spawn_test_player)
         .init_resource::<Assets<StandardMaterial>>()
+        .insert_resource(GrabDistanceSettings { max_distance: 10.0 })
         .insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_secs_f32(
             PHYSICS_STEP,
         )));
         app.finish();
         app
+    }
+
+    fn spawn_test_player(mut commands: Commands) {
+        commands.spawn((
+            Player,
+            Position(Vec3::ZERO),
+            Transform::from_translation(Vec3::ZERO),
+            Name::new("Grab Test Player"),
+        ));
+    }
+
+    fn player_entity(app: &mut App) -> Entity {
+        let world = app.world_mut();
+        let mut players = world.query_filtered::<Entity, With<Player>>();
+        players.iter(world).next().expect("grab test player")
     }
 
     fn spawn_body(app: &mut App, position: Vec3, mass: f32) -> Entity {
@@ -236,6 +274,12 @@ mod tests {
         }
     }
 
+    fn set_max_grab_distance(app: &mut App, max_distance: f32) {
+        app.world_mut()
+            .resource_mut::<GrabDistanceSettings>()
+            .max_distance = max_distance;
+    }
+
     fn position(app: &App, entity: Entity) -> Vec3 {
         app.world()
             .entity(entity)
@@ -259,6 +303,85 @@ mod tests {
             app.world().entity(body).get::<RigidBody>(),
             Some(&RigidBody::Dynamic)
         );
+    }
+
+    #[test]
+    fn objects_at_the_radius_boundary_can_be_grabbed() {
+        let mut app = grabbing_app();
+        set_max_grab_distance(&mut app, 5.0);
+        let body = spawn_body(&mut app, Vec3::new(0.0, 0.0, -5.0), 1.0);
+        point_cursor_at(&mut app, Vec3::new(0.0, 0.0, -5.0));
+
+        assert_eq!(
+            app.world()
+                .resource::<HoverState>()
+                .object
+                .as_ref()
+                .unwrap()
+                .reachability,
+            HoverReachability::Reachable
+        );
+        send_mouse_button(&mut app, ButtonState::Pressed);
+
+        assert_eq!(
+            app.world()
+                .resource::<GrabState>()
+                .grab
+                .map(|grab| grab.entity),
+            Some(body)
+        );
+    }
+
+    #[test]
+    fn unreachable_hover_remains_visible_but_cannot_be_grabbed() {
+        let mut app = grabbing_app();
+        set_max_grab_distance(&mut app, 5.0);
+        let body = spawn_body(&mut app, Vec3::new(0.0, 0.0, -6.0), 1.0);
+        point_cursor_at(&mut app, Vec3::new(0.0, 0.0, -6.0));
+
+        let hover = app.world().resource::<HoverState>().object.clone().unwrap();
+        assert_eq!(hover.entity, body);
+        assert_eq!(hover.reachability, HoverReachability::Unreachable);
+        send_mouse_button(&mut app, ButtonState::Pressed);
+
+        assert!(app.world().resource::<GrabState>().grab.is_none());
+        assert!(!app.world().entity(body).contains::<SpringGrabbed>());
+    }
+
+    #[test]
+    fn moving_the_player_changes_grab_eligibility_and_releases_out_of_range_grabs() {
+        let mut app = grabbing_app();
+        set_max_grab_distance(&mut app, 5.0);
+        let body = spawn_body(&mut app, Vec3::new(0.0, 0.0, -5.0), 1.0);
+        point_cursor_at(&mut app, Vec3::new(0.0, 0.0, -5.0));
+        send_mouse_button(&mut app, ButtonState::Pressed);
+        assert_eq!(
+            app.world()
+                .resource::<GrabState>()
+                .grab
+                .map(|grab| grab.entity),
+            Some(body)
+        );
+
+        let player = player_entity(&mut app);
+        app.world_mut()
+            .entity_mut(player)
+            .get_mut::<Position>()
+            .unwrap()
+            .0 = Vec3::new(0.0, 0.0, 0.01);
+        app.update();
+
+        assert_eq!(
+            app.world()
+                .resource::<HoverState>()
+                .object
+                .as_ref()
+                .unwrap()
+                .reachability,
+            HoverReachability::Unreachable
+        );
+        assert!(app.world().resource::<GrabState>().grab.is_none());
+        assert!(!app.world().entity(body).contains::<SpringGrabbed>());
     }
 
     #[test]

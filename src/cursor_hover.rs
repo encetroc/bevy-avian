@@ -2,8 +2,10 @@ use avian3d::{math::Scalar, prelude::*};
 use bevy::{input::InputSystems, prelude::*, window::PrimaryWindow};
 
 use crate::camera::FixedFollowCamera;
+use crate::player::Player;
 
 const HOVER_COLOR: Color = Color::srgb(1.0, 0.9, 0.15);
+const UNREACHABLE_HOVER_COLOR: Color = Color::srgb(0.95, 0.2, 0.15);
 const HOVER_LABEL_HEIGHT: f32 = 0.35;
 
 /// The ray generated from the current cursor position.
@@ -28,6 +30,35 @@ impl CursorRay {
     }
 }
 
+/// The interaction status of the physical body currently under the cursor.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum HoverReachability {
+    /// The player can start a grab on the hovered body.
+    #[default]
+    Reachable,
+    /// The hovered body is visible but outside the interaction radius.
+    Unreachable,
+}
+
+impl HoverReachability {
+    pub const fn is_reachable(self) -> bool {
+        matches!(self, Self::Reachable)
+    }
+}
+
+/// Tunable distance used to decide whether a hovered body can be grabbed.
+#[derive(Resource, Clone, Copy, Debug, PartialEq)]
+pub struct GrabDistanceSettings {
+    /// Maximum world-space distance from the player to a hovered body.
+    pub max_distance: f32,
+}
+
+impl Default for GrabDistanceSettings {
+    fn default() -> Self {
+        Self { max_distance: 5.0 }
+    }
+}
+
 /// The physical body currently under the cursor and the identity shown to the user.
 #[derive(Clone, Debug, PartialEq)]
 pub struct HoverInfo {
@@ -39,6 +70,8 @@ pub struct HoverInfo {
     pub hit_position: Vec3,
     /// The distance from the camera ray origin to the hit.
     pub distance: f32,
+    /// Whether the player is close enough to start a grab.
+    pub reachability: HoverReachability,
 }
 
 /// Current cursor hover state. `None` means that the cursor is over empty space
@@ -55,12 +88,14 @@ impl Plugin for CursorHoverPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CursorRay>()
             .init_resource::<HoverState>()
+            .init_resource::<GrabDistanceSettings>()
             .add_systems(Startup, create_hover_material)
             .add_systems(PreUpdate, update_cursor_ray.after(InputSystems))
             .add_systems(
                 Update,
                 (
                     update_hover_state,
+                    update_hover_reachability,
                     apply_hover_material,
                     draw_hover_identity.run_if(resource_exists::<GizmoConfigStore>),
                 )
@@ -128,6 +163,7 @@ pub(crate) fn update_hover_state(
                     name,
                     hit_position: ray.origin + ray.direction * hit.distance,
                     distance: hit.distance,
+                    reachability: HoverReachability::Reachable,
                 }
             })
     });
@@ -135,8 +171,61 @@ pub(crate) fn update_hover_state(
     hover.set_if_neq(HoverState { object: next_hover });
 }
 
+/// Updates interaction eligibility without removing hover feedback for distant bodies.
+pub(crate) fn update_hover_reachability(
+    settings: Res<GrabDistanceSettings>,
+    players: Query<&Position, With<Player>>,
+    bodies: Query<&Position>,
+    mut hover: ResMut<HoverState>,
+) {
+    let Some(object) = hover.object.as_ref() else {
+        return;
+    };
+
+    let reachability = players
+        .iter()
+        .next()
+        .and_then(|player| bodies.get(object.entity).ok().map(|body| (player, body)))
+        .map(|(player, body)| is_within_grab_distance(player.0, body.0, settings.max_distance))
+        .map_or(HoverReachability::Reachable, |reachable| {
+            if reachable {
+                HoverReachability::Reachable
+            } else {
+                HoverReachability::Unreachable
+            }
+        });
+
+    if object.reachability == reachability {
+        return;
+    }
+
+    let mut next_object = object.clone();
+    next_object.reachability = reachability;
+    hover.set_if_neq(HoverState {
+        object: Some(next_object),
+    });
+}
+
+pub(crate) fn is_within_grab_distance(
+    player_position: Vec3,
+    body_position: Vec3,
+    max_distance: f32,
+) -> bool {
+    if !max_distance.is_finite() || max_distance < 0.0 {
+        return false;
+    }
+
+    // Keep the exact boundary inclusive despite small physics/integration
+    // rounding differences between the player and body positions.
+    let allowed_distance = max_distance + 1e-5;
+    player_position.distance_squared(body_position) <= allowed_distance * allowed_distance
+}
+
 #[derive(Resource)]
 struct HoverHighlightMaterial(Handle<StandardMaterial>);
+
+#[derive(Resource)]
+struct HoverUnreachableMaterial(Handle<StandardMaterial>);
 
 #[derive(Component)]
 struct HoverOriginalMaterial(Handle<StandardMaterial>);
@@ -154,6 +243,11 @@ fn create_hover_material(
         emissive: LinearRgba::rgb(0.8, 0.55, 0.0),
         ..default()
     })));
+    commands.insert_resource(HoverUnreachableMaterial(materials.add(StandardMaterial {
+        base_color: UNREACHABLE_HOVER_COLOR,
+        emissive: LinearRgba::rgb(0.8, 0.05, 0.02),
+        ..default()
+    })));
 }
 
 /// Swaps the hovered mesh to a shared highlight material and restores the
@@ -162,6 +256,7 @@ fn apply_hover_material(
     mut commands: Commands,
     hover: Res<HoverState>,
     highlight_material: Option<Res<HoverHighlightMaterial>>,
+    unreachable_material: Option<Res<HoverUnreachableMaterial>>,
     mut materials: Query<(
         Entity,
         &mut MeshMaterial3d<StandardMaterial>,
@@ -174,15 +269,30 @@ fn apply_hover_material(
     let Some(highlight_material) = highlight_material else {
         return;
     };
+    let Some(unreachable_material) = unreachable_material else {
+        return;
+    };
 
     for (entity, mut material, original) in &mut materials {
-        if Some(entity) == hover.object.as_ref().map(|object| object.entity) {
+        if let Some(object) = hover
+            .object
+            .as_ref()
+            .filter(|object| object.entity == entity)
+        {
             if original.is_none() {
                 let original_handle = material.0.clone();
-                material.0 = highlight_material.0.clone();
+                material.0 = if object.reachability.is_reachable() {
+                    highlight_material.0.clone()
+                } else {
+                    unreachable_material.0.clone()
+                };
                 commands
                     .entity(entity)
                     .insert(HoverOriginalMaterial(original_handle));
+            } else if object.reachability.is_reachable() {
+                material.0 = highlight_material.0.clone();
+            } else {
+                material.0 = unreachable_material.0.clone();
             }
         } else if let Some(original) = original {
             material.0 = original.0.clone();
@@ -196,16 +306,24 @@ fn draw_hover_identity(mut gizmos: Gizmos, hover: Res<HoverState>) {
     let Some(object) = hover.object.as_ref() else {
         return;
     };
+    let (label, color) = if object.reachability.is_reachable() {
+        (object.name.clone(), HOVER_COLOR)
+    } else {
+        (
+            format!("{} (unreachable)", object.name),
+            UNREACHABLE_HOVER_COLOR,
+        )
+    };
 
     gizmos.text(
         Isometry3d::new(
             object.hit_position + Vec3::Y * HOVER_LABEL_HEIGHT,
             Quat::IDENTITY,
         ),
-        &object.name,
+        &label,
         0.45,
         Vec2::ZERO,
-        HOVER_COLOR,
+        color,
     );
 }
 
@@ -215,6 +333,7 @@ mod tests {
     use std::time::Duration;
 
     use super::*;
+    use crate::player::Player;
 
     fn hover_app() -> App {
         let mut app = App::new();
@@ -248,6 +367,16 @@ mod tests {
                 Transform::from_translation(position),
                 MeshMaterial3d(material),
                 Name::new(name.to_owned()),
+            ))
+            .id()
+    }
+
+    fn spawn_player(app: &mut App, position: Vec3) -> Entity {
+        app.world_mut()
+            .spawn((
+                Player,
+                Position(position),
+                Transform::from_translation(position),
             ))
             .id()
     }
@@ -319,6 +448,91 @@ mod tests {
             app.world()
                 .entity(right)
                 .contains::<HoverOriginalMaterial>()
+        );
+    }
+
+    #[test]
+    fn hover_marks_bodies_outside_the_player_radius_as_unreachable() {
+        let mut app = hover_app();
+        let player = spawn_player(&mut app, Vec3::ZERO);
+        let body = spawn_body(&mut app, "Distant Cube", Vec3::new(0.0, 0.0, -6.0));
+        app.world_mut()
+            .insert_resource(GrabDistanceSettings { max_distance: 5.0 });
+        app.update();
+
+        point_cursor_at(&mut app, Vec3::new(0.0, 0.0, -6.0));
+
+        let hover = app.world().resource::<HoverState>().object.clone().unwrap();
+        assert_eq!(hover.entity, body);
+        assert_eq!(hover.reachability, HoverReachability::Unreachable);
+        assert_eq!(
+            app.world()
+                .entity(body)
+                .get::<MeshMaterial3d<StandardMaterial>>()
+                .unwrap()
+                .0,
+            app.world().resource::<HoverUnreachableMaterial>().0
+        );
+        assert_eq!(
+            app.world().entity(player).get::<Position>().unwrap().0,
+            Vec3::ZERO
+        );
+    }
+
+    #[test]
+    fn moving_the_player_updates_hover_reachability_at_the_boundary() {
+        let mut app = hover_app();
+        let player = spawn_player(&mut app, Vec3::ZERO);
+        let body = spawn_body(&mut app, "Boundary Cube", Vec3::new(0.0, 0.0, -5.0));
+        app.world_mut()
+            .insert_resource(GrabDistanceSettings { max_distance: 5.0 });
+        app.update();
+
+        point_cursor_at(&mut app, Vec3::new(0.0, 0.0, -5.0));
+        assert_eq!(
+            app.world()
+                .resource::<HoverState>()
+                .object
+                .as_ref()
+                .unwrap()
+                .reachability,
+            HoverReachability::Reachable
+        );
+
+        app.world_mut()
+            .entity_mut(player)
+            .get_mut::<Position>()
+            .unwrap()
+            .0 = Vec3::new(0.0, 0.0, 0.01);
+        app.update();
+        assert_eq!(
+            app.world()
+                .resource::<HoverState>()
+                .object
+                .as_ref()
+                .unwrap()
+                .reachability,
+            HoverReachability::Unreachable
+        );
+
+        app.world_mut()
+            .entity_mut(player)
+            .get_mut::<Position>()
+            .unwrap()
+            .0 = Vec3::ZERO;
+        app.update();
+        assert_eq!(
+            app.world()
+                .resource::<HoverState>()
+                .object
+                .as_ref()
+                .unwrap()
+                .reachability,
+            HoverReachability::Reachable
+        );
+        assert_eq!(
+            app.world().entity(body).get::<Name>().unwrap().as_str(),
+            "Boundary Cube"
         );
     }
 

@@ -1,6 +1,10 @@
 use avian3d::prelude::*;
 use bevy::prelude::*;
 
+mod stations;
+
+use stations::StationLayoutPlugin;
+
 fn main() {
     App::new()
         .add_plugins((
@@ -8,6 +12,7 @@ fn main() {
             PhysicsPlugins::default(),
             SandboxPlugin,
             ArenaPlugin,
+            StationLayoutPlugin,
         ))
         .run();
 }
@@ -56,7 +61,7 @@ impl Plugin for ArenaPlugin {
 fn spawn_sandbox_scene(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(),
-        Transform::from_xyz(0.0, 10.0, 14.0).looking_at(Vec3::ZERO, Dir3::Y),
+        Transform::from_xyz(0.0, 23.0, 25.0).looking_at(Vec3::ZERO, Dir3::Y),
         Name::new("Sandbox Camera"),
     ));
 

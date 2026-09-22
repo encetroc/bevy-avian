@@ -4,14 +4,14 @@
 
 **Blocked by:** 28
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] The body moves along the configured axis.
-- [ ] Motion outside the permitted axis is prevented.
+- [x] The body moves along the configured axis.
+- [x] Motion outside the permitted axis is prevented.
 
 ## Tests
 
-- [ ] Push the body along and across the axis.
-- [ ] Verify the limit or constraint remains active under impact.
+- [x] Push the body along and across the axis.
+- [x] Verify the limit or constraint remains active under impact.

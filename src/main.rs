@@ -4,7 +4,9 @@ use bevy::prelude::*;
 mod camera;
 mod stations;
 
-use camera::{CameraFollowPlugin, CameraFollowTarget, FixedFollowCamera};
+#[cfg(test)]
+use camera::FixedFollowCamera;
+use camera::{CameraFollowPlugin, CameraFollowTarget};
 use stations::StationLayoutPlugin;
 
 fn main() {

@@ -77,6 +77,17 @@ struct JointDetails {
     compliance: JointComplianceInfo,
 }
 
+/// A live contact snapshot for one contact manifold involving the selected body.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ContactInspectorSnapshot {
+    pub other_entity: Entity,
+    pub other_name: String,
+    pub position: Vec3,
+    pub normal: Vec3,
+    pub relative_speed: f32,
+    pub impulse: f32,
+}
+
 /// A readable snapshot of the selected body's physics and current simulation state.
 #[derive(Clone, Debug, PartialEq)]
 pub struct InspectorSnapshot {
@@ -98,6 +109,7 @@ pub struct InspectorSnapshot {
     pub restitution: Option<f32>,
     pub sleeping: bool,
     pub sleeping_disabled: bool,
+    pub contacts: Vec<ContactInspectorSnapshot>,
 }
 
 /// Collider details shown by the inspector shell.
@@ -690,6 +702,7 @@ fn refresh_inspector(
     )>,
     joint_names: Query<&Name>,
     joints: JointInspectorQuery<'_, '_>,
+    contact_graph: Res<ContactGraph>,
 ) {
     let selected = selection.entity;
     let next_object = selected.and_then(|entity| {
@@ -762,6 +775,7 @@ fn refresh_inspector(
             restitution: restitution.map(|restitution| restitution.coefficient),
             sleeping,
             sleeping_disabled,
+            contacts: contact_snapshots(entity, &contact_graph, &joint_names),
         })
     });
 
@@ -813,6 +827,63 @@ fn joint_entity_name(names: &Query<&Name>, entity: Entity) -> String {
         .get(entity)
         .map(|name| name.as_str().to_owned())
         .unwrap_or_else(|_| format!("Physics Entity {entity:?}"))
+}
+
+fn contact_snapshots(
+    selected: Entity,
+    contact_graph: &ContactGraph,
+    names: &Query<&Name>,
+) -> Vec<ContactInspectorSnapshot> {
+    contact_graph
+        .iter_active_touching()
+        .chain(contact_graph.iter_sleeping_touching())
+        .filter_map(|pair| {
+            let selected_is_first = if pair.collider1 == selected || pair.body1 == Some(selected) {
+                true
+            } else if pair.collider2 == selected || pair.body2 == Some(selected) {
+                false
+            } else {
+                return None;
+            };
+            let other_entity = if selected_is_first {
+                pair.body2.unwrap_or(pair.collider2)
+            } else {
+                pair.body1.unwrap_or(pair.collider1)
+            };
+            let (manifold, contact) = pair
+                .manifolds
+                .iter()
+                .filter_map(|manifold| {
+                    manifold
+                        .find_deepest_contact()
+                        .map(|contact| (manifold, contact))
+                })
+                .max_by(|(_, first), (_, second)| {
+                    first
+                        .penetration
+                        .partial_cmp(&second.penetration)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })?;
+            let normal = if selected_is_first {
+                manifold.normal
+            } else {
+                -manifold.normal
+            };
+            let relative_speed = if selected_is_first {
+                contact.normal_speed
+            } else {
+                -contact.normal_speed
+            };
+            Some(ContactInspectorSnapshot {
+                other_entity,
+                other_name: joint_entity_name(names, other_entity),
+                position: contact.point,
+                normal,
+                relative_speed,
+                impulse: contact.normal_impulse.abs(),
+            })
+        })
+        .collect()
 }
 
 fn joint_details(
@@ -1697,9 +1768,10 @@ fn format_inspector_text(object: &InspectorSnapshot) -> String {
     let restitution = object
         .restitution
         .map_or_else(|| "default".to_owned(), format_float);
+    let contacts = format_contact_inspector_text(&object.contacts);
 
     format!(
-        "{}\nEntity: {:?}\n\nBODY\nType: {:?}\nMass: {}\nGravity scale: {}\nLinear damping: {}\nAngular damping: {}\nDominance: {}\nAxis locks: {}\n\nCOLLIDER\nShape: {}\nScale: {}\nFriction: {}\nRestitution: {}\n\nCURRENT STATE\nPosition: {}\nRotation: {}\nLinear velocity: {}\nAngular velocity: {}\nSleeping: {}\nSleeping disabled: {}",
+        "{}\nEntity: {:?}\n\nBODY\nType: {:?}\nMass: {}\nGravity scale: {}\nLinear damping: {}\nAngular damping: {}\nDominance: {}\nAxis locks: {}\n\nCOLLIDER\nShape: {}\nScale: {}\nFriction: {}\nRestitution: {}\n\nCURRENT STATE\nPosition: {}\nRotation: {}\nLinear velocity: {}\nAngular velocity: {}\nSleeping: {}\nSleeping disabled: {}\n\nCONTACTS (LIVE)\n{}",
         object.name,
         object.entity,
         object.body,
@@ -1719,7 +1791,32 @@ fn format_inspector_text(object: &InspectorSnapshot) -> String {
         format_vec3(object.angular_velocity),
         object.sleeping,
         object.sleeping_disabled,
+        contacts,
     )
+}
+
+fn format_contact_inspector_text(contacts: &[ContactInspectorSnapshot]) -> String {
+    if contacts.is_empty() {
+        return "No active contacts.".to_owned();
+    }
+
+    contacts
+        .iter()
+        .enumerate()
+        .map(|(index, contact)| {
+            format!(
+                "Contact {}\nPartner: {} ({:?})\nPosition: {}\nNormal: {}\nRelative speed: {} m/s\nImpulse: {} N·s",
+                index + 1,
+                contact.other_name,
+                contact.other_entity,
+                format_vec3(contact.position),
+                format_vec3(contact.normal),
+                format_float(contact.relative_speed),
+                format_float(contact.impulse),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n")
 }
 
 fn format_float(value: f32) -> String {
@@ -2500,6 +2597,69 @@ mod tests {
         assert!(app.world().get_entity(joint).is_err());
         assert_eq!(app.world().resource::<SelectionState>().entity, None);
         assert_eq!(app.world().resource::<InspectorState>().joint, None);
+    }
+
+    #[test]
+    fn selected_body_inspector_reports_live_contact_partner_and_solver_data() {
+        let mut app = inspector_app();
+        let floor = spawn_body(&mut app, "Contact Floor", RigidBody::Static, Vec3::ZERO);
+        let body = app
+            .world_mut()
+            .spawn((
+                RigidBody::Dynamic,
+                Collider::cuboid(0.5, 0.5, 0.5),
+                LinearVelocity::default(),
+                Position(Vec3::new(0.0, 0.4, 0.0)),
+                Transform::from_xyz(0.0, 0.4, 0.0),
+                Name::new("Contact Body"),
+            ))
+            .id();
+        app.update();
+        for _ in 0..10 {
+            app.update();
+        }
+        select_entity(&mut app, body);
+
+        let initial_contact = {
+            let object = app
+                .world()
+                .resource::<InspectorState>()
+                .object
+                .as_ref()
+                .expect("selected body snapshot");
+            let contact = object
+                .contacts
+                .iter()
+                .find(|contact| contact.other_entity == floor)
+                .expect("selected body contact");
+            assert_eq!(contact.other_name, "Contact Floor");
+            assert!(contact.position.is_finite());
+            assert!((contact.normal.length() - 1.0).abs() < 0.01);
+            assert!(contact.relative_speed.is_finite());
+            assert!(contact.impulse.is_finite());
+            contact.clone()
+        };
+        assert!(inspector_text(&mut app).contains("CONTACTS (LIVE)"));
+        assert!(inspector_text(&mut app).contains("Partner: Contact Floor"));
+        app.world_mut()
+            .entity_mut(body)
+            .insert(LinearVelocity(Vec3::new(0.0, -1.0, 0.0)));
+        app.update();
+        let updated_contact = app
+            .world()
+            .resource::<InspectorState>()
+            .object
+            .as_ref()
+            .expect("updated body snapshot")
+            .contacts
+            .iter()
+            .find(|contact| contact.other_entity == floor)
+            .expect("updated selected body contact");
+        assert!(
+            updated_contact != &initial_contact
+                || updated_contact.relative_speed != initial_contact.relative_speed,
+            "contact data should be refreshed while the pair remains active"
+        );
     }
 
     #[test]

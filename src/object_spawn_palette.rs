@@ -6,6 +6,7 @@ use crate::{
     collision_layers::{SandboxLayer, layers_for},
     cursor_hover::CursorRay,
     gameplay_materials::GameplayMaterial,
+    liquid_containers::LiquidContainer,
     object_inspector::SelectionState,
     player::Player,
     stations::StationObject,
@@ -367,6 +368,9 @@ fn spawn_from_controls(
     if let (Some(mesh), Some(material)) = (mesh, material) {
         entity.insert((Mesh3d(mesh), MeshMaterial3d(material)));
     }
+    if preset == SpawnPreset::Barrel {
+        entity.insert(LiquidContainer::new(100.0, 100.0));
+    }
     match preset {
         SpawnPreset::Ceramic => {
             entity.insert((GameplayMaterial::Ceramic, BreakableObject));
@@ -440,6 +444,7 @@ mod tests {
             MeshPlugin,
             PhysicsPlugins::default(),
             crate::gameplay_materials::GameplayMaterialsPlugin,
+            crate::liquid_containers::LiquidContainersPlugin,
             ObjectSpawnPalettePlugin,
         ))
         .init_resource::<CursorRay>()
@@ -583,6 +588,14 @@ mod tests {
                 _ => None,
             };
             assert_eq!(body.get::<GameplayMaterial>().copied(), expected_material);
+            if preset == SpawnPreset::Barrel {
+                assert_eq!(
+                    body.get::<LiquidContainer>(),
+                    Some(&LiquidContainer::new(100.0, 100.0))
+                );
+            } else {
+                assert!(!body.contains::<LiquidContainer>());
+            }
             assert_eq!(
                 body.contains::<BreakableObject>(),
                 expected_material.is_some()

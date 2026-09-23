@@ -26,6 +26,7 @@ mod gravity_controls;
 mod interpolation_comparison;
 mod intersection_testing;
 mod joint_creation;
+mod liquid_containers;
 mod mesh_collider_station;
 mod object_composition;
 mod object_grabbing;
@@ -79,6 +80,7 @@ use gravity_controls::GravityControlsPlugin;
 use interpolation_comparison::InterpolationComparisonPlugin;
 use intersection_testing::IntersectionTestingPlugin;
 use joint_creation::JointCreationPlugin;
+use liquid_containers::LiquidContainersPlugin;
 use mesh_collider_station::MeshColliderStationPlugin;
 use object_composition::ObjectCompositionPlugin;
 use object_grabbing::ObjectGrabbingPlugin;
@@ -126,7 +128,11 @@ fn main() {
         ))
         .add_plugins((GameplayMaterialsPlugin, BreakableObjectsPlugin))
         .add_plugins(WindExperimentPlugin)
-        .add_plugins((ObjectSpawnPalettePlugin, ResetControlsPlugin))
+        .add_plugins((
+            ObjectSpawnPalettePlugin,
+            LiquidContainersPlugin,
+            ResetControlsPlugin,
+        ))
         .add_plugins(PickingComparisonPlugin)
         .add_plugins(DiagnosticsHudPlugin)
         .add_plugins(CountedBodySpawningPlugin)

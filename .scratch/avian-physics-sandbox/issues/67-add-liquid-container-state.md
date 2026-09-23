@@ -1,17 +1,17 @@
 # 67: Add liquid-container state
 
-**What to build:** Add container capacity and amount state with visible text or fill indication.
+**What to build:** Add container capacity and amount state with a visible readout and controls.
 
 **Blocked by:** 60, 64
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] A container has capacity and current amount.
-- [ ] Amount can change while the container remains physically simulated.
+- [x] The spawned barrel is a liquid container with capacity and current amount.
+- [x] Selecting a container shows its amount; `=` / `-` changes its amount without replacing its dynamic rigid body.
 
 ## Tests
 
-- [ ] Create full, partial, and empty containers.
-- [ ] Move containers through the sandbox and verify state persists.
+- [x] Create full, partial, and empty container states; values are clamped to capacity.
+- [x] Headless Avian simulation confirms a dynamic container keeps simulating and retains updated amount state.

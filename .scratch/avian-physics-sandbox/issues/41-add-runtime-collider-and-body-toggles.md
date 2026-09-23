@@ -4,14 +4,14 @@
 
 **Blocked by:** 13, 36
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] A disabled collider stops participating in collisions.
-- [ ] A disabled body stops simulating and can be restored.
+- [x] A disabled collider stops participating in collisions.
+- [x] A disabled body stops simulating and can be restored.
 
 ## Tests
 
-- [ ] Disable a collider while its body is moving.
-- [ ] Re-enable the collider/body and verify simulation resumes correctly.
+- [x] Disable a collider while its body is moving.
+- [x] Re-enable the collider/body and verify simulation resumes correctly.

@@ -5,6 +5,12 @@ use bevy::prelude::*;
 
 const PAUSE_KEY: KeyCode = KeyCode::KeyP;
 const STEP_KEY: KeyCode = KeyCode::KeyN;
+const SPEED_KEYS: [(KeyCode, f32); 4] = [
+    (KeyCode::Digit1, 0.25),
+    (KeyCode::Digit2, 0.5),
+    (KeyCode::Digit3, 1.0),
+    (KeyCode::Digit4, 2.0),
+];
 
 /// Owns keyboard controls for pausing, resuming, and stepping Avian physics.
 pub(crate) struct PhysicsControlsPlugin;
@@ -32,7 +38,9 @@ fn spawn_physics_controls_help(mut commands: Commands) {
             ..default()
         },
         BackgroundColor(Color::srgba(0.02, 0.03, 0.05, 0.85)),
-        Text::new("PHYSICS: RUNNING  |  P: PAUSE/RESUME  |  N: SINGLE STEP"),
+        Text::new(
+            "PHYSICS: RUNNING  |  SPEED: 1x  |  1:0.25x 2:0.5x 3:1x 4:2x  P: PAUSE/RESUME  N: STEP",
+        ),
         TextFont {
             font_size: FontSize::Px(16.0),
             ..default()
@@ -45,10 +53,22 @@ fn spawn_physics_controls_help(mut commands: Commands) {
 /// Handles input in an exclusive system because stepping must run Avian's
 /// complete physics schedule exactly once while its normal clock is paused.
 fn handle_physics_controls(world: &mut World) {
-    let (toggle_pause, step) = {
+    let (toggle_pause, step, selected_speed) = {
         let input = world.resource::<ButtonInput<KeyCode>>();
-        (input.just_pressed(PAUSE_KEY), input.just_pressed(STEP_KEY))
+        (
+            input.just_pressed(PAUSE_KEY),
+            input.just_pressed(STEP_KEY),
+            SPEED_KEYS
+                .iter()
+                .find_map(|(key, speed)| input.just_pressed(*key).then_some(*speed)),
+        )
     };
+
+    if let Some(speed) = selected_speed {
+        world
+            .resource_mut::<Time<Physics>>()
+            .set_relative_speed(speed);
+    }
 
     if toggle_pause {
         let mut time = world.resource_mut::<Time<Physics>>();
@@ -84,8 +104,11 @@ fn update_physics_status(
     } else {
         "RUNNING"
     };
+    let speed = physics_time.relative_speed();
     for mut text in &mut status {
-        **text = format!("PHYSICS: {state}  |  P: PAUSE/RESUME  |  N: SINGLE STEP");
+        **text = format!(
+            "PHYSICS: {state}  |  SPEED: {speed}x  |  1:0.25x 2:0.5x 3:1x 4:2x  P: PAUSE/RESUME  N: STEP"
+        );
     }
 }
 
@@ -133,8 +156,72 @@ mod tests {
         world.resource_mut::<ButtonInput<KeyCode>>().release(key);
     }
 
+    fn distance_after_equal_wall_time(speed_key: KeyCode) -> f32 {
+        let (mut app, body) = physics_app();
+        press(&mut app, speed_key);
+        let initial_x = position(&app, body).x;
+        for _ in 0..120 {
+            app.update();
+        }
+        position(&app, body).x - initial_x
+    }
+
     fn position(app: &App, body: Entity) -> Vec3 {
         app.world().entity(body).get::<Position>().unwrap().0
+    }
+
+    #[test]
+    fn speed_settings_scale_motion_over_equal_wall_clock_intervals() {
+        let measured: Vec<_> = SPEED_KEYS
+            .iter()
+            .map(|(key, speed)| (*speed, distance_after_equal_wall_time(*key)))
+            .collect();
+
+        let baseline = measured[2].1;
+        assert!(
+            baseline > 0.0,
+            "1x simulation made no progress: {measured:?}"
+        );
+        for (speed, distance) in measured {
+            let expected = baseline * speed;
+            assert!(
+                (distance - expected).abs() < 0.02,
+                "{speed}x moved {distance}, expected approximately {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn speed_can_change_while_running_and_pause_resume_preserves_speed() {
+        let (mut app, body) = physics_app();
+        app.update();
+        press(&mut app, KeyCode::Digit4);
+        assert_eq!(
+            app.world().resource::<Time<Physics>>().relative_speed(),
+            2.0
+        );
+        press(&mut app, PAUSE_KEY);
+        let stopped_at = position(&app, body);
+        for _ in 0..5 {
+            app.update();
+        }
+        assert_eq!(position(&app, body), stopped_at);
+
+        press(&mut app, KeyCode::Digit1);
+        assert_eq!(
+            app.world().resource::<Time<Physics>>().relative_speed(),
+            0.25
+        );
+        assert!(app.world().resource::<Time<Physics>>().is_paused());
+        press(&mut app, PAUSE_KEY);
+        for _ in 0..8 {
+            app.update();
+        }
+        assert!(position(&app, body).x > stopped_at.x);
+        assert_eq!(
+            app.world().resource::<Time<Physics>>().relative_speed(),
+            0.25
+        );
     }
 
     #[test]

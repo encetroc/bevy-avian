@@ -4,14 +4,14 @@
 
 **Blocked by:** 52
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] Speed can be changed while running.
-- [ ] The setting changes simulation progression without changing world scale.
+- [x] Speed can be changed while running (1-4 select 0.25x, 0.5x, 1x, and 2x).
+- [x] The setting changes simulation progression without changing world scale (Avian's physics clock relative speed is adjusted).
 
 ## Tests
 
-- [ ] Measure motion over equal wall-clock intervals at each setting.
-- [ ] Pause and resume after changing speed.
+- [x] Measure motion over equal wall-clock intervals at each setting (headless deterministic test compares motion across equal 120-frame intervals).
+- [x] Pause and resume after changing speed (headless test verifies speed changes while paused are preserved on resume).

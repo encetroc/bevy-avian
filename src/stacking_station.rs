@@ -7,6 +7,8 @@ const PANEL_BACKGROUND: Color = Color::srgba(0.035, 0.05, 0.08, 0.94);
 const PANEL_TEXT: Color = Color::srgb(0.87, 0.92, 0.98);
 const CONTROL_BACKGROUND: Color = Color::srgb(0.12, 0.18, 0.28);
 const CONTROL_PRESSED: Color = Color::srgb(0.2, 0.38, 0.55);
+const SLEEPING_COLOR: Color = Color::srgb(0.45, 0.78, 1.0);
+const AWAKE_COLOR: Color = Color::srgb(1.0, 0.72, 0.32);
 const STACK_Z: f32 = 8.15;
 const OBJECT_DENSITY: f32 = 0.75;
 
@@ -207,13 +209,18 @@ pub struct StackingStationPlugin;
 impl Plugin for StackingStationPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<ResetStation>()
+            .add_message::<SleepingControlAction>()
+            .init_resource::<SleepingControlsState>()
             .add_systems(Startup, (spawn_stacking_lab, spawn_stacking_station_ui))
             .add_systems(
                 Update,
                 (
                     queue_stacking_station_actions,
+                    apply_sleeping_controls,
+                    update_sleeping_status,
                     update_stacking_button_colors,
-                ),
+                )
+                    .chain(),
             )
             .add_systems(
                 Update,
@@ -264,6 +271,33 @@ struct StackingStationPanel;
 #[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
 enum StackingStationControl {
     Reset,
+    SleepAll,
+    WakeAll,
+    ToggleSleeping,
+}
+
+#[derive(Component)]
+struct SleepingStatusText;
+
+#[derive(Component)]
+struct SleepingDisabledByStackingControls;
+
+#[derive(Resource)]
+struct SleepingControlsState {
+    enabled: bool,
+}
+
+impl Default for SleepingControlsState {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
+#[derive(Message, Clone, Copy, Debug, Eq, PartialEq)]
+enum SleepingControlAction {
+    SleepAll,
+    WakeAll,
+    ToggleSleeping,
 }
 
 fn spawn_stacking_station_ui(mut commands: Commands) {
@@ -308,7 +342,7 @@ fn spawn_stacking_station_ui(mut commands: Commands) {
                 ));
             }
             parent.spawn((
-                Text::new("F1 shows the actual Avian colliders; select a body to inspect sleep state."),
+                Text::new("F1 shows Avian colliders; colored labels identify each body's sleep state."),
                 TextFont::from_font_size(12.0),
                 TextColor(PANEL_TEXT),
                 Node {
@@ -316,6 +350,29 @@ fn spawn_stacking_station_ui(mut commands: Commands) {
                     ..default()
                 },
             ));
+            parent.spawn((
+                Text::new("Awake: 0   Sleeping: 0"),
+                TextFont::from_font_size(13.0),
+                TextColor(PANEL_TEXT),
+                SleepingStatusText,
+                Name::new("Stacking sleep state counts"),
+            ));
+            parent
+                .spawn(Node {
+                    width: percent(100.0),
+                    height: px(26.0),
+                    align_items: AlignItems::Center,
+                    ..default()
+                })
+                .with_children(|row| {
+                    for (label, control) in [
+                        ("WAKE ALL", StackingStationControl::WakeAll),
+                        ("SLEEP ALL", StackingStationControl::SleepAll),
+                        ("TOGGLE SLEEP", StackingStationControl::ToggleSleeping),
+                    ] {
+                        spawn_stacking_control(row, label, control);
+                    }
+                });
             parent
                 .spawn((
                     Button,
@@ -338,14 +395,138 @@ fn spawn_stacking_station_ui(mut commands: Commands) {
         });
 }
 
+fn spawn_stacking_control(
+    parent: &mut ChildSpawnerCommands,
+    label: &'static str,
+    control: StackingStationControl,
+) {
+    parent
+        .spawn((
+            Button,
+            control,
+            Node {
+                width: px(112.0),
+                height: px(22.0),
+                margin: UiRect::right(px(3.0)),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            BackgroundColor(CONTROL_BACKGROUND),
+            Name::new(format!("Stacking control {label}")),
+        ))
+        .with_child((
+            Text::new(label),
+            TextFont::from_font_size(10.0),
+            TextColor(PANEL_TEXT),
+        ));
+}
+
 fn queue_stacking_station_actions(
     controls: Query<(&Interaction, &StackingStationControl), Changed<Interaction>>,
     mut resets: MessageWriter<ResetStation>,
+    mut sleeping_actions: MessageWriter<SleepingControlAction>,
 ) {
     for (interaction, control) in &controls {
-        if *interaction == Interaction::Pressed && *control == StackingStationControl::Reset {
-            resets.write(ResetStation { code: 'J' });
+        if *interaction != Interaction::Pressed {
+            continue;
         }
+
+        match control {
+            StackingStationControl::Reset => {
+                resets.write(ResetStation { code: 'J' });
+            }
+            StackingStationControl::SleepAll => {
+                sleeping_actions.write(SleepingControlAction::SleepAll);
+            }
+            StackingStationControl::WakeAll => {
+                sleeping_actions.write(SleepingControlAction::WakeAll);
+            }
+            StackingStationControl::ToggleSleeping => {
+                sleeping_actions.write(SleepingControlAction::ToggleSleeping);
+            }
+        }
+    }
+}
+
+type SleepingControlBodies<'w, 's> = Query<
+    'w,
+    's,
+    (
+        Entity,
+        &'static RigidBody,
+        Has<SleepingDisabled>,
+        Has<SleepingDisabledByStackingControls>,
+    ),
+    With<StackingLabObject>,
+>;
+
+fn apply_sleeping_controls(
+    mut actions: MessageReader<SleepingControlAction>,
+    mut state: ResMut<SleepingControlsState>,
+    bodies: SleepingControlBodies<'_, '_>,
+    mut commands: Commands,
+) {
+    for action in actions.read().copied() {
+        match action {
+            SleepingControlAction::SleepAll if state.enabled => {
+                for (entity, body, sleeping_disabled, _) in &bodies {
+                    if body.is_dynamic() && !sleeping_disabled {
+                        commands.entity(entity).insert(Sleeping);
+                    }
+                }
+            }
+            SleepingControlAction::WakeAll => {
+                for (entity, body, sleeping_disabled, _) in &bodies {
+                    if body.is_dynamic() && !sleeping_disabled {
+                        commands.entity(entity).remove::<Sleeping>();
+                    }
+                }
+            }
+            SleepingControlAction::ToggleSleeping => {
+                state.enabled = !state.enabled;
+                for (entity, body, sleeping_disabled, disabled_by_controls) in &bodies {
+                    if !body.is_dynamic() {
+                        continue;
+                    }
+                    if state.enabled && disabled_by_controls {
+                        commands
+                            .entity(entity)
+                            .remove::<(SleepingDisabled, SleepingDisabledByStackingControls)>();
+                    } else if !state.enabled && !sleeping_disabled {
+                        commands
+                            .entity(entity)
+                            .remove::<Sleeping>()
+                            .insert((SleepingDisabled, SleepingDisabledByStackingControls));
+                    }
+                }
+            }
+            SleepingControlAction::SleepAll => {}
+        }
+    }
+}
+
+fn update_sleeping_status(
+    state: Res<SleepingControlsState>,
+    bodies: Query<(&RigidBody, Has<Sleeping>, Has<SleepingDisabled>), With<StackingLabObject>>,
+    mut status: Query<&mut Text, With<SleepingStatusText>>,
+) {
+    let mut awake = 0;
+    let mut sleeping = 0;
+    for (body, is_sleeping, _) in &bodies {
+        if body.is_dynamic() {
+            if is_sleeping {
+                sleeping += 1;
+            } else {
+                awake += 1;
+            }
+        }
+    }
+    for mut text in &mut status {
+        *text = Text::new(format!(
+            "Awake: {awake}   Sleeping: {sleeping}   Sleeping {}",
+            if state.enabled { "ON" } else { "OFF" }
+        ));
     }
 }
 
@@ -360,17 +541,26 @@ fn update_stacking_button_colors(
     }
 }
 
-fn draw_stacking_labels(mut gizmos: Gizmos, objects: Query<(&StackingLabObject, &Transform)>) {
-    for (object, transform) in &objects {
+fn draw_stacking_labels(
+    mut gizmos: Gizmos,
+    objects: Query<(&StackingLabObject, &Transform, Has<Sleeping>)>,
+) {
+    for (object, transform, is_sleeping) in &objects {
+        let (label, color) = if is_sleeping {
+            ("SLEEPING", SLEEPING_COLOR)
+        } else {
+            ("AWAKE", AWAKE_COLOR)
+        };
+        let label = format!("{} · {label}", object.kind.label());
         gizmos.text(
             Isometry3d::new(
                 transform.translation + Vec3::Y * (object.kind.half_height() + 0.2),
                 Quat::IDENTITY,
             ),
-            object.kind.label(),
+            &label,
             0.22,
             Vec2::ZERO,
-            object.kind.color(),
+            color,
         );
     }
 }
@@ -518,6 +708,88 @@ mod tests {
             "too few stack objects came to rest: {resting}"
         );
         assert!(sleeping >= 5, "stack objects never entered sleeping state");
+    }
+
+    #[test]
+    fn sleep_controls_count_sleep_wake_and_toggle_only_eligible_lab_bodies() {
+        let mut app = stacking_app(false);
+        app.update();
+        let by_kind = objects(&mut app);
+        let eligible = by_kind[&StackingObjectKind::Cube][0];
+        let disabled = by_kind[&StackingObjectKind::Cube][1];
+        let sleeping_disabled = by_kind[&StackingObjectKind::Cube][2];
+        app.world_mut()
+            .entity_mut(sleeping_disabled)
+            .insert(SleepingDisabled);
+
+        let sleep_all_button = {
+            let world = app.world_mut();
+            let mut buttons = world.query_filtered::<Entity, With<StackingStationControl>>();
+            buttons
+                .iter(world)
+                .find(|entity| {
+                    world.entity(*entity).get::<StackingStationControl>()
+                        == Some(&StackingStationControl::SleepAll)
+                })
+                .expect("Sleep All button")
+        };
+        app.world_mut()
+            .entity_mut(sleep_all_button)
+            .insert(Interaction::Pressed);
+        app.update();
+        assert!(app.world().entity(eligible).contains::<Sleeping>());
+        assert!(app.world().entity(disabled).contains::<Sleeping>());
+        assert!(!app.world().entity(sleeping_disabled).contains::<Sleeping>());
+        let status = app
+            .world_mut()
+            .query_filtered::<&Text, With<SleepingStatusText>>()
+            .single(app.world())
+            .expect("sleep status text");
+        assert!(status.0.contains("Sleeping: 14"), "{status:?}");
+
+        app.world_mut()
+            .resource_mut::<Messages<SleepingControlAction>>()
+            .write(SleepingControlAction::WakeAll);
+        app.update();
+        assert!(!app.world().entity(eligible).contains::<Sleeping>());
+        assert!(!app.world().entity(disabled).contains::<Sleeping>());
+
+        app.world_mut()
+            .resource_mut::<Messages<SleepingControlAction>>()
+            .write(SleepingControlAction::ToggleSleeping);
+        app.update();
+        assert!(!app.world().resource::<SleepingControlsState>().enabled);
+        assert!(app.world().entity(eligible).contains::<SleepingDisabled>());
+        assert!(
+            app.world()
+                .entity(eligible)
+                .contains::<SleepingDisabledByStackingControls>()
+        );
+        run_steps(&mut app, 480);
+        let world = app.world_mut();
+        let mut disabled_bodies = world.query_filtered::<&Sleeping, With<StackingLabObject>>();
+        assert_eq!(disabled_bodies.iter(world).count(), 0);
+        app.world_mut()
+            .resource_mut::<Messages<SleepingControlAction>>()
+            .write(SleepingControlAction::SleepAll);
+        app.update();
+        assert!(!app.world().entity(eligible).contains::<Sleeping>());
+
+        app.world_mut()
+            .resource_mut::<Messages<SleepingControlAction>>()
+            .write(SleepingControlAction::ToggleSleeping);
+        app.update();
+        assert!(app.world().resource::<SleepingControlsState>().enabled);
+        assert!(!app.world().entity(eligible).contains::<SleepingDisabled>());
+        assert!(
+            app.world()
+                .entity(sleeping_disabled)
+                .contains::<SleepingDisabled>()
+        );
+        run_steps(&mut app, 480);
+        let world = app.world_mut();
+        let mut sleeping_bodies = world.query_filtered::<&Sleeping, With<StackingLabObject>>();
+        assert!(sleeping_bodies.iter(world).count() > 0);
     }
 
     #[test]

@@ -8,10 +8,10 @@
 
 ## Acceptance criteria
 
-- [ ] Sleeping bodies are distinguishable from awake bodies.
-- [ ] Wake All and Sleep All affect eligible bodies.
+- [x] Sleeping bodies are distinguishable from awake bodies.
+- [x] Wake All and Sleep All affect eligible bodies.
 
 ## Tests
 
-- [ ] Let a pile settle and compare counts.
-- [ ] Disable and re-enable sleeping and observe the difference.
+- [x] Let a pile settle and compare counts (deterministic headless test).
+- [x] Disable and re-enable sleeping and observe the difference (deterministic headless test).

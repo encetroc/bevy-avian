@@ -24,6 +24,7 @@ mod object_grabbing;
 mod object_inspector;
 mod player;
 mod prismatic_joint_station;
+mod raycaster_station;
 mod restitution_station;
 mod revolute_joint_station;
 mod rigid_body_station;
@@ -58,6 +59,7 @@ use object_grabbing::ObjectGrabbingPlugin;
 use object_inspector::ObjectInspectorPlugin;
 use player::PlayerPlugin;
 use prismatic_joint_station::PrismaticJointStationPlugin;
+use raycaster_station::RayCasterStationPlugin;
 use restitution_station::RestitutionStationPlugin;
 use revolute_joint_station::RevoluteJointStationPlugin;
 use rigid_body_station::RigidBodyStationPlugin;
@@ -86,6 +88,7 @@ fn main() {
             PlayerPlugin,
             StationLayoutPlugin,
         ))
+        .add_plugins(RayCasterStationPlugin)
         .add_plugins(SensorZonesPlugin)
         .add_plugins(CollisionEventLogPlugin)
         .add_plugins((CollisionHookDemoPlugin, CollisionLayerDemoPlugin))

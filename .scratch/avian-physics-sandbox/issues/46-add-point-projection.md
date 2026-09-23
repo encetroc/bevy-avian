@@ -4,14 +4,14 @@
 
 **Blocked by:** 42
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] A projection result includes the target collider and point.
-- [ ] The displayed point lies on the collider surface.
+- [x] A projection result includes the target collider and point.
+- [x] The displayed point lies on the collider surface.
 
 ## Tests
 
-- [ ] Click near several collider faces and edges.
-- [ ] Verify no projection is shown when no collider is eligible.
+- [x] Click near several collider faces and edges.
+- [x] Verify no projection is shown when no collider is eligible.

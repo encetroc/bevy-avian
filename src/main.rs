@@ -9,6 +9,7 @@ mod collider_shape_station;
 mod collision_event_log;
 mod collision_hooks;
 mod collision_layers;
+mod counted_body_spawning;
 mod cursor_hover;
 mod damping_station;
 mod density_mass_station;
@@ -54,6 +55,7 @@ use collider_shape_station::ColliderShapeStationPlugin;
 use collision_event_log::CollisionEventLogPlugin;
 use collision_hooks::{CollisionHookDemoPlugin, SandboxCollisionHooks};
 use collision_layers::{CollisionLayerDemoPlugin, SandboxLayer, layers_for};
+use counted_body_spawning::CountedBodySpawningPlugin;
 use cursor_hover::CursorHoverPlugin;
 use damping_station::DampingStationPlugin;
 use density_mass_station::DensityMassStationPlugin;
@@ -109,6 +111,7 @@ fn main() {
             PlayerPlugin,
         ))
         .add_plugins(DiagnosticsHudPlugin)
+        .add_plugins(CountedBodySpawningPlugin)
         .add_plugins(InterpolationComparisonPlugin)
         .add_plugins((StationLayoutPlugin, CcdLauncherPlugin, RotationalCcdPlugin))
         .add_plugins((IntersectionTestingPlugin, PointProjectionPlugin))

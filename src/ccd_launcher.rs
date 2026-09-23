@@ -556,7 +556,7 @@ mod tests {
     }
 
     #[test]
-    fn extreme_discrete_launch_tunnels_but_each_supported_ccd_mode_collides() {
+    fn extreme_discrete_launch_tunnels_and_supported_modes_record_results() {
         let mut discrete = launcher_app();
         discrete.update();
         action(
@@ -594,8 +594,42 @@ mod tests {
                 assert_eq!(
                     outcome,
                     LauncherOutcome::Collided,
-                    "{mode:?} did not stop the extreme projectile"
+                    "{mode:?} did not stop the high-speed projectile"
                 );
+            }
+        }
+    }
+
+    #[test]
+    fn changing_mode_changes_the_components_on_the_next_launched_body() {
+        for mode in LauncherCcdMode::ALL {
+            let mut app = launcher_app();
+            app.update();
+            action(&mut app, CcdLauncherAction::SetMode(mode));
+            action(&mut app, CcdLauncherAction::Launch);
+            app.update();
+
+            let world = app.world_mut();
+            let mut projectiles = world.query_filtered::<
+                    (Option<&SpeculativeMargin>, Option<&SweptCcd>),
+                    With<CcdLauncherProjectile>,
+                >();
+            let (speculative, swept) = projectiles.iter(world).next().expect("launched projectile");
+            match mode {
+                LauncherCcdMode::None => {
+                    assert_eq!(speculative, Some(&SpeculativeMargin::ZERO));
+                    assert!(swept.is_none());
+                }
+                LauncherCcdMode::Speculative => {
+                    assert_eq!(speculative, Some(&SpeculativeMargin::MAX));
+                    assert!(swept.is_none());
+                }
+                LauncherCcdMode::SweptLinear => {
+                    assert_eq!(swept.map(|ccd| ccd.mode), Some(SweepMode::Linear));
+                }
+                LauncherCcdMode::SweptNonLinear => {
+                    assert_eq!(swept.map(|ccd| ccd.mode), Some(SweepMode::NonLinear));
+                }
             }
         }
     }

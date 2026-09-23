@@ -2307,6 +2307,104 @@ mod tests {
     }
 
     #[test]
+    fn disabled_collider_stops_a_moving_body_then_collides_when_reenabled() {
+        let mut app = inspector_app();
+        let first_wall = spawn_body(&mut app, "First wall", RigidBody::Static, Vec3::ZERO);
+        let second_wall = spawn_body(
+            &mut app,
+            "Second wall",
+            RigidBody::Static,
+            Vec3::new(4.0, 0.0, 0.0),
+        );
+        let body = app
+            .world_mut()
+            .spawn((
+                RigidBody::Dynamic,
+                Collider::cuboid(0.5, 0.5, 0.5),
+                LinearVelocity(Vec3::X * 5.0),
+                GravityScale(0.0),
+                Position(Vec3::new(-3.0, 0.0, 0.0)),
+                Transform::from_xyz(-3.0, 0.0, 0.0),
+                Name::new("Moving toggle body"),
+            ))
+            .id();
+        app.update();
+        select_entity(&mut app, body);
+
+        press_control(&mut app, InspectorControl::ToggleColliderEnabled);
+        for _ in 0..50 {
+            app.update();
+        }
+        let passed_first_wall = app.world().entity(body).get::<Position>().unwrap().0;
+        assert!(
+            passed_first_wall.x > 0.5,
+            "disabled collider should pass the first wall: {passed_first_wall:?}"
+        );
+        assert!(app.world().entity(body).contains::<ColliderDisabled>());
+
+        press_control(&mut app, InspectorControl::ToggleColliderEnabled);
+        for _ in 0..90 {
+            app.update();
+        }
+        let stopped_at_second_wall = app.world().entity(body).get::<Position>().unwrap().0;
+        let velocity = app.world().entity(body).get::<LinearVelocity>().unwrap().0;
+        assert!(
+            stopped_at_second_wall.x < 3.6,
+            "re-enabled collider should stop at the second wall: {stopped_at_second_wall:?}"
+        );
+        assert!(
+            velocity.x.abs() < 0.1,
+            "re-enabled collider should resolve the collision: {velocity:?}"
+        );
+        assert!(!app.world().entity(body).contains::<ColliderDisabled>());
+        assert!(app.world().entity(first_wall).contains::<Collider>());
+        assert!(app.world().entity(second_wall).contains::<Collider>());
+    }
+
+    #[test]
+    fn disabled_body_pauses_motion_then_resumes_when_reenabled() {
+        let mut app = inspector_app();
+        let body = editable_body(&mut app, Vec3::ZERO);
+        app.world_mut()
+            .entity_mut(body)
+            .insert(LinearVelocity(Vec3::X * 2.0));
+        app.update();
+        select_entity(&mut app, body);
+
+        for _ in 0..30 {
+            app.update();
+        }
+        let moving_position = app.world().entity(body).get::<Position>().unwrap().0;
+
+        press_control(&mut app, InspectorControl::ToggleBodyEnabled);
+        let disabled_position = app.world().entity(body).get::<Position>().unwrap().0;
+        for _ in 0..30 {
+            app.update();
+        }
+        let paused_position = app.world().entity(body).get::<Position>().unwrap().0;
+        assert!(
+            (paused_position - disabled_position).length() < 0.001,
+            "disabled body moved: disabled={disabled_position:?}, paused={paused_position:?}"
+        );
+        assert!(
+            (disabled_position - moving_position).length() < 0.05,
+            "body moved too far while being disabled: moving={moving_position:?}, disabled={disabled_position:?}"
+        );
+        assert!(app.world().entity(body).contains::<RigidBodyDisabled>());
+
+        press_control(&mut app, InspectorControl::ToggleBodyEnabled);
+        for _ in 0..30 {
+            app.update();
+        }
+        let resumed_position = app.world().entity(body).get::<Position>().unwrap().0;
+        assert!(
+            resumed_position.x > paused_position.x + 0.5,
+            "re-enabled body should resume motion: paused={paused_position:?}, resumed={resumed_position:?}"
+        );
+        assert!(!app.world().entity(body).contains::<RigidBodyDisabled>());
+    }
+
+    #[test]
     fn axis_lock_controls_toggle_all_six_axes_and_dominance() {
         let mut app = inspector_app();
         let body = editable_body(&mut app, Vec3::ZERO);

@@ -4,14 +4,14 @@
 
 **Blocked by:** 06
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] Physics stops while paused.
-- [ ] Single-step advances simulation once without resuming continuous time.
+- [x] Physics stops while paused (P toggles pause/resume).
+- [x] Single-step advances simulation once without resuming continuous time (N pauses and advances one fixed step).
 
 ## Tests
 
-- [ ] Pause a moving body and verify its transform is stable.
-- [ ] Step repeatedly and verify discrete progress.
+- [x] Pause a moving body and verify its transform is stable (headless test).
+- [x] Step repeatedly and verify discrete progress (headless test).

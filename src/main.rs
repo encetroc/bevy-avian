@@ -24,6 +24,7 @@ mod mesh_collider_station;
 mod object_composition;
 mod object_grabbing;
 mod object_inspector;
+mod physics_controls;
 mod player;
 mod point_projection;
 mod prismatic_joint_station;
@@ -66,6 +67,7 @@ use mesh_collider_station::MeshColliderStationPlugin;
 use object_composition::ObjectCompositionPlugin;
 use object_grabbing::ObjectGrabbingPlugin;
 use object_inspector::ObjectInspectorPlugin;
+use physics_controls::PhysicsControlsPlugin;
 use player::PlayerPlugin;
 use point_projection::PointProjectionPlugin;
 use prismatic_joint_station::PrismaticJointStationPlugin;
@@ -92,6 +94,7 @@ fn main() {
             CursorHoverPlugin,
             DampingStationPlugin,
             ObjectInspectorPlugin,
+            PhysicsControlsPlugin,
             SandboxPlugin,
             CameraFollowPlugin,
             ArenaPlugin,

@@ -12,6 +12,7 @@ mod collision_hooks;
 mod collision_layers;
 mod counted_body_spawning;
 mod cursor_hover;
+mod custom_constraint_station;
 mod damping_station;
 mod density_mass_station;
 mod diagnostics_hud;
@@ -66,6 +67,7 @@ use collision_hooks::{CollisionHookDemoPlugin, SandboxCollisionHooks};
 use collision_layers::{CollisionLayerDemoPlugin, SandboxLayer, layers_for};
 use counted_body_spawning::CountedBodySpawningPlugin;
 use cursor_hover::CursorHoverPlugin;
+use custom_constraint_station::CustomConstraintStationPlugin;
 use damping_station::DampingStationPlugin;
 use density_mass_station::DensityMassStationPlugin;
 use diagnostics_hud::DiagnosticsHudPlugin;
@@ -142,6 +144,7 @@ fn main() {
             FreeSandboxPlugin,
             CcdLauncherPlugin,
             RotationalCcdPlugin,
+            CustomConstraintStationPlugin,
         ))
         .add_plugins((IntersectionTestingPlugin, PointProjectionPlugin))
         .add_plugins((

@@ -4,14 +4,14 @@
 
 **Blocked by:** 28, 29, 30, 31, 32
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] The constraint has one documented purpose and demonstration.
-- [ ] It can be enabled and observed without affecting other stations.
+- [x] The constraint has one documented purpose and demonstration: a custom XPBD center-distance constraint keeps the demo body's center 2 m from a static anchor.
+- [x] It can be enabled and observed without affecting other stations; the toggle is isolated to the free-sandbox demonstration.
 
 ## Tests
 
-- [ ] Run the custom-constraint station repeatedly.
-- [ ] Disable it and verify the demonstration returns to unconstrained behavior.
+- [x] Run the custom-constraint station repeatedly (headless test creates and simulates the station three times).
+- [x] Disable it and verify the demonstration returns to unconstrained behavior, then re-enable and verify the distance constraint again.

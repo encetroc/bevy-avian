@@ -5,6 +5,7 @@ use avian3d::{
 use bevy::{input::InputSystems, prelude::*};
 
 use crate::camera::{CameraFollowTarget, FixedFollowCamera};
+use crate::collision_layers::{SandboxLayer, layers_for};
 
 /// The player's capsule radius in world units.
 pub const PLAYER_RADIUS: f32 = 0.45;
@@ -88,6 +89,7 @@ fn spawn_player(
         Player,
         CameraFollowTarget,
         RigidBody::Kinematic,
+        layers_for(SandboxLayer::Player),
         // MoveAndSlide performs the position integration and prevents the
         // default kinematic integration from bypassing collision response.
         CustomPositionIntegration,

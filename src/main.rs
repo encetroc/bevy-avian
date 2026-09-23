@@ -6,6 +6,7 @@ mod camera;
 mod collider_debug;
 mod collider_shape_station;
 mod collision_event_log;
+mod collision_layers;
 mod cursor_hover;
 mod damping_station;
 mod density_mass_station;
@@ -38,6 +39,7 @@ use camera::FixedFollowCamera;
 use collider_debug::ColliderDebugPlugin;
 use collider_shape_station::ColliderShapeStationPlugin;
 use collision_event_log::CollisionEventLogPlugin;
+use collision_layers::{CollisionLayerDemoPlugin, SandboxLayer, layers_for};
 use cursor_hover::CursorHoverPlugin;
 use damping_station::DampingStationPlugin;
 use density_mass_station::DensityMassStationPlugin;
@@ -84,6 +86,7 @@ fn main() {
         ))
         .add_plugins(SensorZonesPlugin)
         .add_plugins(CollisionEventLogPlugin)
+        .add_plugins(CollisionLayerDemoPlugin)
         .add_plugins((JointCreationPlugin, ObjectCompositionPlugin))
         .add_plugins((
             AxisLocksStationPlugin,
@@ -190,6 +193,7 @@ fn spawn_physics_arena(
         floor_size,
         RigidBody::Static,
         Some(ArenaFloor),
+        layers_for(SandboxLayer::World),
         wall_visuals,
     );
 
@@ -225,6 +229,7 @@ fn spawn_physics_arena(
             size,
             RigidBody::Static,
             Some(ArenaWall),
+            layers_for(SandboxLayer::World),
             wall_visuals,
         );
     }
@@ -236,6 +241,7 @@ fn spawn_physics_arena(
         Vec3::splat(ARENA_TEST_BODY_SIZE),
         RigidBody::Dynamic,
         Some(ArenaTestBody),
+        layers_for(SandboxLayer::Objects),
         body_visuals,
     );
 }
@@ -246,6 +252,10 @@ struct BoxVisuals<'a> {
     material: Option<&'a Handle<StandardMaterial>>,
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "arena box helper keeps collision-layer and visual setup together"
+)]
 fn spawn_box(
     commands: &mut Commands,
     name: &str,
@@ -253,11 +263,13 @@ fn spawn_box(
     size: Vec3,
     body: RigidBody,
     marker: Option<impl Bundle>,
+    layers: CollisionLayers,
     visuals: BoxVisuals<'_>,
 ) -> Entity {
     let mut entity = commands.spawn((
         body,
         Collider::cuboid(size.x, size.y, size.z),
+        layers,
         Transform::from_translation(position),
         Name::new(name.to_owned()),
     ));

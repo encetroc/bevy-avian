@@ -2,6 +2,7 @@ use avian3d::prelude::*;
 use bevy::prelude::*;
 
 use crate::camera::FixedFollowCamera;
+use crate::collision_layers::{SandboxLayer, layers_for};
 use crate::player::{Player, PlayerInput, PlayerMovementSet, PlayerMovementSettings};
 use crate::stations::StationObject;
 
@@ -208,6 +209,7 @@ fn spawn_dynamic_test_objects(
             },
             StationObject::new('A', initial_transform).with_velocities(Vec3::ZERO, Vec3::ZERO),
             RigidBody::Dynamic,
+            layers_for(SandboxLayer::Objects),
             definition.collider(),
             ColliderDensity(definition.density),
             initial_transform,

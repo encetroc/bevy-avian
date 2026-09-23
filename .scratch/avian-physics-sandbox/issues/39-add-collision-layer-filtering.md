@@ -4,14 +4,14 @@
 
 **Blocked by:** 36
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] Each category is visibly labelled.
-- [ ] Configured pairs collide or pass through according to their masks.
+- [x] Each category is visibly labelled.
+- [x] Configured pairs collide or pass through according to their masks.
 
 ## Tests
 
-- [ ] Run the red/blue wall demonstration.
-- [ ] Change a mask and verify the collision result changes.
+- [x] Run the red/blue wall demonstration.
+- [x] Change a mask and verify the collision result changes.

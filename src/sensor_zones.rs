@@ -1,6 +1,7 @@
 use avian3d::prelude::*;
 use bevy::prelude::*;
 
+use crate::collision_layers::{SandboxLayer, layers_for};
 use crate::dynamic_objects::{DynamicObjectKind, DynamicTestObject};
 use crate::stations::StationObject;
 
@@ -50,6 +51,7 @@ fn spawn_sensor_zone(
     let mut sensor = commands.spawn((
         SensorZone,
         RigidBody::Static,
+        layers_for(SandboxLayer::Sensors),
         Collider::cuboid(SENSOR_ZONE_SIZE.x, SENSOR_ZONE_SIZE.y, SENSOR_ZONE_SIZE.z),
         Sensor,
         CollisionEventsEnabled,
@@ -74,6 +76,7 @@ fn spawn_sensor_zone(
         },
         StationObject::new('F', object_transform),
         RigidBody::Dynamic,
+        layers_for(SandboxLayer::Objects),
         Collider::cuboid(0.8, 0.8, 0.8),
         SleepingDisabled,
         object_transform,

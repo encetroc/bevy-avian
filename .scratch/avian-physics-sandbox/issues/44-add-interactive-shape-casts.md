@@ -4,14 +4,14 @@
 
 **Blocked by:** 42
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] The cast shape and path are visible.
-- [ ] The first hit and normal are reported.
+- [x] The cast shape and path are visible.
+- [x] The first hit and normal are reported.
 
 ## Tests
 
-- [ ] Sweep through an obstacle and empty space.
-- [ ] Compare sphere and capsule results where supported.
+- [x] Sweep through an obstacle and empty space.
+- [x] Compare sphere and capsule results where supported.

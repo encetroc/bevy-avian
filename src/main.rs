@@ -17,6 +17,7 @@ mod fixed_joint_station;
 mod force_station;
 mod friction_station;
 mod gravity_controls;
+mod intersection_testing;
 mod joint_creation;
 mod mesh_collider_station;
 mod object_composition;
@@ -55,6 +56,7 @@ use fixed_joint_station::FixedJointStationPlugin;
 use force_station::ForceStationPlugin;
 use friction_station::FrictionStationPlugin;
 use gravity_controls::GravityControlsPlugin;
+use intersection_testing::IntersectionTestingPlugin;
 use joint_creation::JointCreationPlugin;
 use mesh_collider_station::MeshColliderStationPlugin;
 use object_composition::ObjectCompositionPlugin;
@@ -94,7 +96,7 @@ fn main() {
             PlayerPlugin,
             StationLayoutPlugin,
         ))
-        .add_plugins(PointProjectionPlugin)
+        .add_plugins((IntersectionTestingPlugin, PointProjectionPlugin))
         .add_plugins((
             RayCasterStationPlugin,
             ShapeCastStationPlugin,

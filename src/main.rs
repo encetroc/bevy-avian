@@ -20,6 +20,7 @@ mod fixed_joint_station;
 mod force_station;
 mod free_sandbox;
 mod friction_station;
+pub mod gameplay_materials;
 mod gravity_controls;
 mod interpolation_comparison;
 mod intersection_testing;
@@ -70,6 +71,7 @@ use fixed_joint_station::FixedJointStationPlugin;
 use force_station::ForceStationPlugin;
 use free_sandbox::FreeSandboxPlugin;
 use friction_station::FrictionStationPlugin;
+use gameplay_materials::GameplayMaterialsPlugin;
 use gravity_controls::GravityControlsPlugin;
 use interpolation_comparison::InterpolationComparisonPlugin;
 use intersection_testing::IntersectionTestingPlugin;
@@ -118,6 +120,7 @@ fn main() {
             ObjectGrabbingPlugin,
             PlayerPlugin,
         ))
+        .add_plugins(GameplayMaterialsPlugin)
         .add_plugins((ObjectSpawnPalettePlugin, ResetControlsPlugin))
         .add_plugins(PickingComparisonPlugin)
         .add_plugins(DiagnosticsHudPlugin)

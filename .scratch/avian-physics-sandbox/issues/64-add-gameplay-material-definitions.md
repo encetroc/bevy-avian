@@ -4,14 +4,14 @@
 
 **Blocked by:** 14, 19
 
-**Status:** ready-for-agent
+**Status:** done
 
 ## Acceptance criteria
 
-- [ ] Materials can provide density, friction, restitution, break threshold, and wind response defaults.
-- [ ] Avian remains directly usable without being hidden behind a replacement abstraction.
+- [x] Materials can provide density, friction, restitution, break threshold, and wind response defaults.
+- [x] Avian remains directly usable without being hidden behind a replacement abstraction.
 
 ## Tests
 
-- [ ] Assign different materials to identical objects.
-- [ ] Verify defaults configure physics and gameplay state independently.
+- [x] Assign different materials to identical objects.
+- [x] Verify defaults configure physics and gameplay state independently.

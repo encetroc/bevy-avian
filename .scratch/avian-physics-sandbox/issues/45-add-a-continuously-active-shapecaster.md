@@ -4,14 +4,14 @@
 
 **Blocked by:** 44
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] The caster updates as the entity moves.
-- [ ] The current obstacle result is visible.
+- [x] The caster updates as the entity moves.
+- [x] The current obstacle result is visible.
 
 ## Tests
 
-- [ ] Move the entity toward and away from an obstacle.
-- [ ] Verify results update without restarting the query.
+- [x] Move the entity toward and away from an obstacle.
+- [x] Verify results update without restarting the query.

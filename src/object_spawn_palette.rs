@@ -6,6 +6,7 @@ use crate::{
     cursor_hover::CursorRay,
     object_inspector::SelectionState,
     player::Player,
+    stations::StationObject,
 };
 
 const PANEL_BACKGROUND: Color = Color::srgba(0.035, 0.05, 0.08, 0.94);
@@ -321,6 +322,7 @@ fn spawn_from_controls(
         .map(|materials| materials.add(preset.color()));
     let mut entity = commands.spawn((
         SpawnedSandboxObject { preset },
+        StationObject::new('J', Transform::from_translation(position)),
         RigidBody::Dynamic,
         layers_for(SandboxLayer::Objects),
         preset.collider(),

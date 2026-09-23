@@ -4,14 +4,14 @@
 
 **Blocked by:** 07, 61, 62
 
-**Status:** ready-for-agent
+**Status:** completed
 
 ## Acceptance criteria
 
-- [ ] R resets only the current station.
-- [ ] Shift+R resets the complete sandbox without restarting the application.
+- [x] R resets only the current station.
+- [x] Shift+R resets the complete sandbox without restarting the application.
 
 ## Tests
 
-- [ ] Disturb multiple stations and invoke R.
-- [ ] Invoke Shift+R and verify all resettable state returns to baseline.
+- [x] Disturb multiple stations and invoke R.
+- [x] Invoke Shift+R and verify all resettable state returns to baseline.

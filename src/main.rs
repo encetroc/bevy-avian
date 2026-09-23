@@ -35,6 +35,7 @@ mod player;
 mod point_projection;
 mod prismatic_joint_station;
 mod raycaster_station;
+mod reset_controls;
 mod restitution_station;
 mod revolute_joint_station;
 mod rigid_body_station;
@@ -84,6 +85,7 @@ use player::PlayerPlugin;
 use point_projection::PointProjectionPlugin;
 use prismatic_joint_station::PrismaticJointStationPlugin;
 use raycaster_station::RayCasterStationPlugin;
+use reset_controls::ResetControlsPlugin;
 use restitution_station::RestitutionStationPlugin;
 use revolute_joint_station::RevoluteJointStationPlugin;
 use rigid_body_station::RigidBodyStationPlugin;
@@ -116,7 +118,7 @@ fn main() {
             ObjectGrabbingPlugin,
             PlayerPlugin,
         ))
-        .add_plugins(ObjectSpawnPalettePlugin)
+        .add_plugins((ObjectSpawnPalettePlugin, ResetControlsPlugin))
         .add_plugins(PickingComparisonPlugin)
         .add_plugins(DiagnosticsHudPlugin)
         .add_plugins(CountedBodySpawningPlugin)

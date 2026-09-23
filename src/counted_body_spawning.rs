@@ -72,10 +72,10 @@ impl Plugin for CountedBodySpawningPlugin {
 }
 
 #[derive(Resource, Default)]
-struct SpawnedBodyCount(usize);
+pub(crate) struct SpawnedBodyCount(pub(crate) usize);
 
 #[derive(Resource, Default)]
-struct SelectedStressMode(StressObjectKind);
+pub(crate) struct SelectedStressMode(pub(crate) StressObjectKind);
 
 #[derive(Component, Clone, Copy)]
 enum CountedBodyControl {

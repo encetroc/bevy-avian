@@ -102,7 +102,7 @@ struct GrabInput<'w, 's> {
 }
 
 fn handle_grab_input(input: GrabInput, mut state: ResMut<GrabState>, mut commands: Commands) {
-    if input.mouse.just_pressed(MouseButton::Left) {
+    if input.mouse.just_pressed(MouseButton::Left) && input.keyboard.pressed(KeyCode::KeyG) {
         release_grab(&mut state, &mut commands);
 
         let Some(hover) = input.hover.object.as_ref() else {
@@ -147,7 +147,7 @@ fn handle_grab_input(input: GrabInput, mut state: ResMut<GrabState>, mut command
         }
     }
 
-    if !input.mouse.pressed(MouseButton::Left) {
+    if !input.mouse.pressed(MouseButton::Left) || !input.keyboard.pressed(KeyCode::KeyG) {
         release_grab(&mut state, &mut commands);
         return;
     }
@@ -326,6 +326,9 @@ mod tests {
 
     fn send_mouse_button_for(app: &mut App, button: MouseButton, state: ButtonState) {
         app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::KeyG);
+        app.world_mut()
             .resource_mut::<Messages<MouseButtonInput>>()
             .write(MouseButtonInput {
                 button,
@@ -357,6 +360,48 @@ mod tests {
             .get::<Position>()
             .expect("body position")
             .0
+    }
+
+    #[test]
+    fn ordinary_left_click_does_not_start_a_spring_grab() {
+        let mut app = grabbing_app();
+        let body = spawn_body(&mut app, Vec3::new(0.0, 0.0, -5.0), 1.0);
+        point_cursor_at(&mut app, Vec3::new(0.0, 0.0, -5.0));
+        app.world_mut()
+            .resource_mut::<Messages<MouseButtonInput>>()
+            .write(MouseButtonInput {
+                button: MouseButton::Left,
+                state: ButtonState::Pressed,
+                window: Entity::PLACEHOLDER,
+            });
+        app.update();
+
+        assert_eq!(app.world().resource::<GrabState>().grab, None);
+        assert!(!app.world().entity(body).contains::<SpringGrabbed>());
+        assert!(app.world().resource::<HoverState>().object.is_some());
+    }
+
+    #[test]
+    fn releasing_the_grab_modifier_releases_the_body() {
+        let mut app = grabbing_app();
+        let body = spawn_body(&mut app, Vec3::new(0.0, 0.0, -5.0), 1.0);
+        point_cursor_at(&mut app, Vec3::new(0.0, 0.0, -5.0));
+        send_mouse_button(&mut app, ButtonState::Pressed);
+        assert_eq!(
+            app.world()
+                .resource::<GrabState>()
+                .grab
+                .map(|grab| grab.entity),
+            Some(body)
+        );
+
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .release(KeyCode::KeyG);
+        app.update();
+
+        assert_eq!(app.world().resource::<GrabState>().grab, None);
+        assert!(!app.world().entity(body).contains::<SpringGrabbed>());
     }
 
     #[test]

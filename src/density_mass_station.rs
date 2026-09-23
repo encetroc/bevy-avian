@@ -778,6 +778,9 @@ mod tests {
 
     fn send_left_button(app: &mut App, state: ButtonState) {
         app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::KeyG);
+        app.world_mut()
             .resource_mut::<Messages<MouseButtonInput>>()
             .write(MouseButtonInput {
                 button: MouseButton::Left,

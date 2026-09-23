@@ -28,6 +28,7 @@ mod object_composition;
 mod object_grabbing;
 mod object_inspector;
 mod physics_controls;
+mod picking_comparison;
 mod player;
 mod point_projection;
 mod prismatic_joint_station;
@@ -74,6 +75,7 @@ use object_composition::ObjectCompositionPlugin;
 use object_grabbing::ObjectGrabbingPlugin;
 use object_inspector::ObjectInspectorPlugin;
 use physics_controls::PhysicsControlsPlugin;
+use picking_comparison::PickingComparisonPlugin;
 use player::PlayerPlugin;
 use point_projection::PointProjectionPlugin;
 use prismatic_joint_station::PrismaticJointStationPlugin;
@@ -110,6 +112,7 @@ fn main() {
             ObjectGrabbingPlugin,
             PlayerPlugin,
         ))
+        .add_plugins(PickingComparisonPlugin)
         .add_plugins(DiagnosticsHudPlugin)
         .add_plugins(CountedBodySpawningPlugin)
         .add_plugins(InterpolationComparisonPlugin)

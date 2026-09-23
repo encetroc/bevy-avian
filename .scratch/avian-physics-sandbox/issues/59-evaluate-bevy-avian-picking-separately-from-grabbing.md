@@ -4,14 +4,14 @@
 
 **Blocked by:** 09, 42
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] Selection can be tested without grabbing.
-- [ ] The UI identifies which mechanism produced the selection.
+- [x] Selection can be tested without grabbing.
+- [x] The UI identifies which mechanism produced the selection.
 
 ## Tests
 
-- [ ] Select objects without dragging.
-- [ ] Grab objects and verify the comparison output distinguishes both paths.
+- [x] Select objects without dragging.
+- [x] Grab objects and verify the comparison output distinguishes both paths.

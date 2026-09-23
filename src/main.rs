@@ -18,6 +18,7 @@ mod fixed_joint_station;
 mod force_station;
 mod friction_station;
 mod gravity_controls;
+mod interpolation_comparison;
 mod intersection_testing;
 mod joint_creation;
 mod mesh_collider_station;
@@ -61,6 +62,7 @@ use fixed_joint_station::FixedJointStationPlugin;
 use force_station::ForceStationPlugin;
 use friction_station::FrictionStationPlugin;
 use gravity_controls::GravityControlsPlugin;
+use interpolation_comparison::InterpolationComparisonPlugin;
 use intersection_testing::IntersectionTestingPlugin;
 use joint_creation::JointCreationPlugin;
 use mesh_collider_station::MeshColliderStationPlugin;
@@ -104,6 +106,7 @@ fn main() {
             ObjectGrabbingPlugin,
             PlayerPlugin,
         ))
+        .add_plugins(InterpolationComparisonPlugin)
         .add_plugins((StationLayoutPlugin, CcdLauncherPlugin, RotationalCcdPlugin))
         .add_plugins((IntersectionTestingPlugin, PointProjectionPlugin))
         .add_plugins((

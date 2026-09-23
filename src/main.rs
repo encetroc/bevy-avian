@@ -28,6 +28,7 @@ mod mesh_collider_station;
 mod object_composition;
 mod object_grabbing;
 mod object_inspector;
+mod object_spawn_palette;
 mod physics_controls;
 mod picking_comparison;
 mod player;
@@ -76,6 +77,7 @@ use mesh_collider_station::MeshColliderStationPlugin;
 use object_composition::ObjectCompositionPlugin;
 use object_grabbing::ObjectGrabbingPlugin;
 use object_inspector::ObjectInspectorPlugin;
+use object_spawn_palette::ObjectSpawnPalettePlugin;
 use physics_controls::PhysicsControlsPlugin;
 use picking_comparison::PickingComparisonPlugin;
 use player::PlayerPlugin;
@@ -114,6 +116,7 @@ fn main() {
             ObjectGrabbingPlugin,
             PlayerPlugin,
         ))
+        .add_plugins(ObjectSpawnPalettePlugin)
         .add_plugins(PickingComparisonPlugin)
         .add_plugins(DiagnosticsHudPlugin)
         .add_plugins(CountedBodySpawningPlugin)

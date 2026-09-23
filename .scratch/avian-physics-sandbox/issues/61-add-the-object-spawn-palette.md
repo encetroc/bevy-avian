@@ -8,10 +8,10 @@
 
 ## Acceptance criteria
 
-- [ ] Tab opens and closes the palette.
-- [ ] Each preset spawns at the cursor world position or near the player.
+- [x] Tab opens and closes the palette.
+- [x] Each preset spawns at the cursor world position or near the player.
 
 ## Tests
 
-- [ ] Spawn every preset.
-- [ ] Verify spawned objects use the intended shape and material defaults.
+- [x] Headless tests spawn every preset and verify collider shape, mesh/material defaults, density, restitution, and cursor/player placement.
+- [x] Headless tests verify Tab palette visibility and spawning fallback near the player.

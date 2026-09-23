@@ -6,6 +6,7 @@ mod camera;
 mod collider_debug;
 mod collider_shape_station;
 mod collision_event_log;
+mod collision_hooks;
 mod collision_layers;
 mod cursor_hover;
 mod damping_station;
@@ -39,6 +40,7 @@ use camera::FixedFollowCamera;
 use collider_debug::ColliderDebugPlugin;
 use collider_shape_station::ColliderShapeStationPlugin;
 use collision_event_log::CollisionEventLogPlugin;
+use collision_hooks::{CollisionHookDemoPlugin, SandboxCollisionHooks};
 use collision_layers::{CollisionLayerDemoPlugin, SandboxLayer, layers_for};
 use cursor_hover::CursorHoverPlugin;
 use damping_station::DampingStationPlugin;
@@ -69,7 +71,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            PhysicsPlugins::default(),
+            PhysicsPlugins::default().with_collision_hooks::<SandboxCollisionHooks>(),
             ColliderDebugPlugin,
             CursorHoverPlugin,
             DampingStationPlugin,
@@ -86,7 +88,7 @@ fn main() {
         ))
         .add_plugins(SensorZonesPlugin)
         .add_plugins(CollisionEventLogPlugin)
-        .add_plugins(CollisionLayerDemoPlugin)
+        .add_plugins((CollisionHookDemoPlugin, CollisionLayerDemoPlugin))
         .add_plugins((JointCreationPlugin, ObjectCompositionPlugin))
         .add_plugins((
             AxisLocksStationPlugin,

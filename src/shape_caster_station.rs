@@ -2,6 +2,7 @@ use avian3d::prelude::*;
 use bevy::prelude::*;
 
 use crate::collision_layers::{SandboxLayer, layers_for};
+use crate::spatial_query_filters::{SpatialQueryFilterSet, SpatialQueryFilterState};
 
 const CAST_COLOR: Color = Color::srgb(0.15, 0.85, 1.0);
 const HIT_COLOR: Color = Color::srgb(1.0, 0.65, 0.15);
@@ -47,13 +48,17 @@ pub struct ShapeCasterStationPlugin;
 
 impl Plugin for ShapeCasterStationPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_shape_caster_demo)
+        app.init_resource::<SpatialQueryFilterState>()
+            .add_systems(Startup, spawn_shape_caster_demo)
             .add_systems(
                 Update,
                 (
+                    update_shape_caster_filter,
                     move_shape_caster_demo,
                     draw_shape_caster_demo.run_if(resource_exists::<GizmoConfigStore>),
-                ),
+                )
+                    .chain()
+                    .after(SpatialQueryFilterSet::ApplyControls),
             );
     }
 }
@@ -106,6 +111,16 @@ fn spawn_shape_caster_demo(
             MeshMaterial3d(material),
             Transform::from_translation(OBSTACLE_POSITION).with_scale(OBSTACLE_SIZE),
         ));
+    }
+}
+
+fn update_shape_caster_filter(
+    state: Res<SpatialQueryFilterState>,
+    mut casters: Query<&mut ShapeCaster, With<ShapeCasterDemo>>,
+) {
+    let filter = state.query_filter();
+    for mut caster in &mut casters {
+        caster.query_filter = filter.clone();
     }
 }
 
@@ -274,6 +289,19 @@ mod tests {
         run_physics_frame(&mut app);
         let return_hit = first_hit(&mut app).expect("obstacle should be ahead again");
         assert!((return_hit.distance - initial_hit.distance).abs() < 0.01);
+    }
+
+    #[test]
+    fn excluded_layers_cannot_become_the_shape_caster_hit() {
+        let mut app = shape_caster_app();
+        run_physics_frame(&mut app);
+        assert!(first_hit(&mut app).is_some());
+
+        app.world_mut()
+            .resource_mut::<SpatialQueryFilterState>()
+            .mask = LayerMask::NONE;
+        run_physics_frame(&mut app);
+        assert!(first_hit(&mut app).is_none());
     }
 
     #[test]

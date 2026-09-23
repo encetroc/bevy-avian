@@ -4,14 +4,14 @@
 
 **Blocked by:** 39, 42
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] The UI exposes the required layer filters.
-- [ ] Raycasts and shape casts respect the selected filters.
+- [x] The UI exposes the required layer filters.
+- [x] Raycasts and shape casts respect the selected filters.
 
 ## Tests
 
-- [ ] Toggle one layer at a time and repeat a query.
-- [ ] Verify excluded objects cannot become the reported hit.
+- [x] Toggle one layer at a time and repeat a query.
+- [x] Verify excluded objects cannot become the reported hit.

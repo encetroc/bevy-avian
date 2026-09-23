@@ -34,6 +34,7 @@ mod scene_collider_station;
 mod sensor_zones;
 mod shape_cast_station;
 mod shape_caster_station;
+mod spatial_query_filters;
 mod spherical_joint_station;
 mod stacking_station;
 mod stations;
@@ -73,6 +74,7 @@ use scene_collider_station::SceneColliderStationPlugin;
 use sensor_zones::SensorZonesPlugin;
 use shape_cast_station::ShapeCastStationPlugin;
 use shape_caster_station::ShapeCasterStationPlugin;
+use spatial_query_filters::SpatialQueryFiltersPlugin;
 use spherical_joint_station::SphericalJointStationPlugin;
 use stacking_station::StackingStationPlugin;
 use stations::StationLayoutPlugin;
@@ -98,6 +100,7 @@ fn main() {
         ))
         .add_plugins((IntersectionTestingPlugin, PointProjectionPlugin))
         .add_plugins((
+            SpatialQueryFiltersPlugin,
             RayCasterStationPlugin,
             ShapeCastStationPlugin,
             ShapeCasterStationPlugin,

@@ -2,6 +2,7 @@ use avian3d::prelude::*;
 use bevy::{input::InputSystems, prelude::*};
 
 use crate::collision_layers::{SandboxLayer, layers_for};
+use crate::spatial_query_filters::{SpatialQueryFilterSet, SpatialQueryFilterState};
 
 const PANEL_BACKGROUND: Color = Color::srgba(0.035, 0.05, 0.08, 0.94);
 const PANEL_TEXT: Color = Color::srgb(0.87, 0.92, 0.98);
@@ -18,7 +19,8 @@ const CAST_DISTANCE: f32 = 5.0;
 const BLOCKED_START: Vec3 = Vec3::new(-8.0, 1.0, 5.0);
 const EMPTY_START: Vec3 = Vec3::new(-8.0, 1.0, 6.9);
 const CAST_DIRECTION: Dir3 = Dir3::X;
-const OBSTACLE_POSITION: Vec3 = Vec3::new(-5.0, 1.0, 5.0);
+const OBSTACLE_POSITION: Vec3 = Vec3::new(-6.5, 1.0, 5.0);
+const WORLD_OBSTACLE_POSITION: Vec3 = Vec3::new(-5.0, 1.0, 5.0);
 const OBSTACLE_SIZE: Vec3 = Vec3::new(0.55, 1.6, 1.4);
 
 /// The two primitive shapes supported by the interactive sweep demonstration.
@@ -103,6 +105,10 @@ pub enum ShapeCastAction {
 #[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ShapeCastDemoObstacle;
 
+/// Marks the second obstacle used to prove that a layer exclusion changes the hit.
+#[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ShapeCastDemoWorldObstacle;
+
 #[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
 enum ShapeCastControl {
     Shape(ShapeCastKind),
@@ -122,6 +128,7 @@ impl Plugin for ShapeCastStationPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ShapeCastDemoState>()
             .init_resource::<ShapeCastDemoResult>()
+            .init_resource::<SpatialQueryFilterState>()
             .add_message::<ShapeCastAction>()
             .add_systems(
                 Startup,
@@ -140,7 +147,8 @@ impl Plugin for ShapeCastStationPlugin {
                     update_shape_cast_ui,
                     draw_shape_cast_demo.run_if(resource_exists::<GizmoConfigStore>),
                 )
-                    .chain(),
+                    .chain()
+                    .after(SpatialQueryFilterSet::ApplyControls),
             );
     }
 }
@@ -158,16 +166,32 @@ fn spawn_shape_cast_demo(
     let mut obstacle = commands.spawn((
         ShapeCastDemoObstacle,
         RigidBody::Static,
-        layers_for(SandboxLayer::World),
+        layers_for(SandboxLayer::Objects),
         Collider::cuboid(OBSTACLE_SIZE.x, OBSTACLE_SIZE.y, OBSTACLE_SIZE.z),
         Transform::from_translation(OBSTACLE_POSITION),
-        Name::new("Shape Cast Obstacle"),
+        Name::new("Shape Cast Objects Obstacle"),
     ));
-    if let (Some(mesh), Some(material)) = (mesh, material) {
+    if let (Some(mesh), Some(material)) = (mesh.as_ref(), material.as_ref()) {
         obstacle.insert((
-            Mesh3d(mesh),
-            MeshMaterial3d(material),
+            Mesh3d(mesh.clone()),
+            MeshMaterial3d(material.clone()),
             Transform::from_translation(OBSTACLE_POSITION).with_scale(OBSTACLE_SIZE),
+        ));
+    }
+
+    let mut world_obstacle = commands.spawn((
+        ShapeCastDemoWorldObstacle,
+        RigidBody::Static,
+        layers_for(SandboxLayer::World),
+        Collider::cuboid(OBSTACLE_SIZE.x, OBSTACLE_SIZE.y, OBSTACLE_SIZE.z),
+        Transform::from_translation(WORLD_OBSTACLE_POSITION),
+        Name::new("Shape Cast World Obstacle"),
+    ));
+    if let (Some(mesh), Some(material)) = (mesh.as_ref(), material.as_ref()) {
+        world_obstacle.insert((
+            Mesh3d(mesh.clone()),
+            MeshMaterial3d(material.clone()),
+            Transform::from_translation(WORLD_OBSTACLE_POSITION).with_scale(OBSTACLE_SIZE),
         ));
     }
 }
@@ -328,6 +352,7 @@ fn apply_shape_cast_actions(
 fn update_shape_cast_result(
     spatial_query: SpatialQuery,
     state: Res<ShapeCastDemoState>,
+    filter_state: Res<SpatialQueryFilterState>,
     mut result: ResMut<ShapeCastDemoResult>,
 ) {
     let hit = spatial_query.cast_shape(
@@ -336,7 +361,7 @@ fn update_shape_cast_result(
         Quat::IDENTITY,
         state.direction(),
         &ShapeCastConfig::from_max_distance(CAST_DISTANCE),
-        &SpatialQueryFilter::default(),
+        &filter_state.query_filter(),
     );
     result.hit = hit;
 }
@@ -528,6 +553,39 @@ mod tests {
             );
             assert!((hit.point1.x - (OBSTACLE_POSITION.x - OBSTACLE_SIZE.x * 0.5)).abs() < 0.01);
         }
+    }
+
+    #[test]
+    fn excluded_layers_cannot_become_the_reported_hit() {
+        let mut app = shape_cast_app();
+        run_physics_frame(&mut app);
+        let objects_obstacle = obstacle_entity(&mut app);
+        let world_obstacle = app
+            .world_mut()
+            .query_filtered::<Entity, With<ShapeCastDemoWorldObstacle>>()
+            .iter(app.world())
+            .next()
+            .expect("world shape-cast obstacle");
+
+        app.world_mut()
+            .resource_mut::<SpatialQueryFilterState>()
+            .mask = LayerMask::from(SandboxLayer::World);
+        run_physics_frame(&mut app);
+        assert_eq!(
+            app.world()
+                .resource::<ShapeCastDemoResult>()
+                .hit
+                .as_ref()
+                .map(|hit| hit.entity),
+            Some(world_obstacle)
+        );
+        assert_ne!(objects_obstacle, world_obstacle);
+
+        app.world_mut()
+            .resource_mut::<SpatialQueryFilterState>()
+            .mask = LayerMask::NONE;
+        run_physics_frame(&mut app);
+        assert!(app.world().resource::<ShapeCastDemoResult>().hit.is_none());
     }
 
     #[test]

@@ -3,6 +3,7 @@ use bevy::{input::InputSystems, prelude::*, window::PrimaryWindow};
 
 use crate::camera::FixedFollowCamera;
 use crate::player::Player;
+use crate::spatial_query_filters::{SpatialQueryFilterSet, SpatialQueryFilterState};
 
 const HOVER_COLOR: Color = Color::srgb(1.0, 0.9, 0.15);
 const UNREACHABLE_HOVER_COLOR: Color = Color::srgb(0.95, 0.2, 0.15);
@@ -96,6 +97,7 @@ impl Plugin for CursorHoverPlugin {
         app.init_resource::<CursorRay>()
             .init_resource::<HoverState>()
             .init_resource::<GrabDistanceSettings>()
+            .init_resource::<SpatialQueryFilterState>()
             .add_systems(Startup, create_hover_material)
             .add_systems(PreUpdate, update_cursor_ray.after(InputSystems))
             .add_systems(
@@ -106,7 +108,8 @@ impl Plugin for CursorHoverPlugin {
                     apply_hover_material,
                     draw_cursor_raycast.run_if(resource_exists::<GizmoConfigStore>),
                 )
-                    .chain(),
+                    .chain()
+                    .after(SpatialQueryFilterSet::ApplyControls),
             );
     }
 }
@@ -145,12 +148,13 @@ fn update_cursor_ray(
 pub(crate) fn update_hover_state(
     cursor_ray: Res<CursorRay>,
     spatial_query: SpatialQuery,
+    filter_state: Res<SpatialQueryFilterState>,
     selectable_bodies: Query<(), (With<Collider>, With<RigidBody>)>,
     names: Query<&Name>,
     mut hover: ResMut<HoverState>,
 ) {
     let next_hover = cursor_ray.ray.and_then(|ray| {
-        let filter = SpatialQueryFilter::default();
+        let filter = filter_state.query_filter();
         spatial_query
             .cast_ray_predicate(
                 ray.origin,

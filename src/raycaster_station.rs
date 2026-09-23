@@ -2,6 +2,7 @@ use avian3d::prelude::*;
 use bevy::prelude::*;
 
 use crate::collision_layers::{SandboxLayer, layers_for};
+use crate::spatial_query_filters::{SpatialQueryFilterSet, SpatialQueryFilterState};
 
 const RAY_COLOR: Color = Color::srgb(0.15, 0.85, 1.0);
 const RAY_HIT_COLOR: Color = Color::srgb(1.0, 0.65, 0.15);
@@ -26,10 +27,17 @@ pub struct RayCasterStationPlugin;
 
 impl Plugin for RayCasterStationPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_raycaster_demo).add_systems(
-            Update,
-            draw_raycaster_demo.run_if(resource_exists::<GizmoConfigStore>),
-        );
+        app.init_resource::<SpatialQueryFilterState>()
+            .add_systems(Startup, spawn_raycaster_demo)
+            .add_systems(
+                Update,
+                (
+                    update_raycaster_filter,
+                    draw_raycaster_demo.run_if(resource_exists::<GizmoConfigStore>),
+                )
+                    .chain()
+                    .after(SpatialQueryFilterSet::ApplyControls),
+            );
     }
 }
 
@@ -57,15 +65,17 @@ fn spawn_raycaster_demo(
 
     spawn_surface(
         &mut commands,
-        "RayCaster Near Surface",
+        "RayCaster Near Objects Surface",
         NEAR_SURFACE_POSITION,
+        SandboxLayer::Objects,
         mesh.as_ref(),
         near_material.as_ref(),
     );
     spawn_surface(
         &mut commands,
-        "RayCaster Far Surface",
+        "RayCaster Far World Surface",
         FAR_SURFACE_POSITION,
+        SandboxLayer::World,
         mesh.as_ref(),
         far_material.as_ref(),
     );
@@ -75,13 +85,14 @@ fn spawn_surface(
     commands: &mut Commands,
     name: &'static str,
     position: Vec3,
+    layer: SandboxLayer,
     mesh: Option<&Handle<Mesh>>,
     material: Option<&Handle<StandardMaterial>>,
 ) -> Entity {
     let mut surface = commands.spawn((
         RayCasterDemoSurface,
         RigidBody::Static,
-        layers_for(SandboxLayer::World),
+        layers_for(layer),
         Collider::cuboid(SURFACE_SIZE.x, SURFACE_SIZE.y, SURFACE_SIZE.z),
         Transform::from_translation(position),
         Name::new(name),
@@ -94,6 +105,16 @@ fn spawn_surface(
         ));
     }
     surface.id()
+}
+
+fn update_raycaster_filter(
+    state: Res<SpatialQueryFilterState>,
+    mut casters: Query<&mut RayCaster, With<RayCasterDemo>>,
+) {
+    let filter = state.query_filter();
+    for mut caster in &mut casters {
+        caster.query_filter = filter.clone();
+    }
 }
 
 fn draw_raycaster_demo(
@@ -249,6 +270,31 @@ mod tests {
         app.world_mut()
             .entity_mut(caster)
             .insert(Transform::from_translation(Vec3::new(-4.0, 1.0, 6.0)));
+        run_physics_frame(&mut app);
+        assert!(first_hit(&mut app).is_none());
+    }
+
+    #[test]
+    fn excluded_layers_cannot_become_the_reported_hit() {
+        let mut app = raycaster_app();
+        run_physics_frame(&mut app);
+        let far_surface = app
+            .world_mut()
+            .query_filtered::<(Entity, &Name), With<RayCasterDemoSurface>>()
+            .iter(app.world())
+            .find(|(_, name)| name.as_str().contains("Far World"))
+            .map(|(entity, _)| entity)
+            .expect("far world surface");
+
+        app.world_mut()
+            .resource_mut::<SpatialQueryFilterState>()
+            .mask = LayerMask::from(SandboxLayer::World);
+        run_physics_frame(&mut app);
+        assert_eq!(first_hit(&mut app).map(|hit| hit.entity), Some(far_surface));
+
+        app.world_mut()
+            .resource_mut::<SpatialQueryFilterState>()
+            .mask = LayerMask::NONE;
         run_physics_frame(&mut app);
         assert!(first_hit(&mut app).is_none());
     }

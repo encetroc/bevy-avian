@@ -11,6 +11,12 @@ const SPEED_KEYS: [(KeyCode, f32); 4] = [
     (KeyCode::Digit3, 1.0),
     (KeyCode::Digit4, 2.0),
 ];
+const SUBSTEP_KEYS: [(KeyCode, u32); 4] = [
+    (KeyCode::Digit5, 1),
+    (KeyCode::Digit6, 2),
+    (KeyCode::Digit7, 4),
+    (KeyCode::Digit8, 8),
+];
 
 /// Owns keyboard controls for pausing, resuming, and stepping Avian physics.
 pub(crate) struct PhysicsControlsPlugin;
@@ -39,7 +45,7 @@ fn spawn_physics_controls_help(mut commands: Commands) {
         },
         BackgroundColor(Color::srgba(0.02, 0.03, 0.05, 0.85)),
         Text::new(
-            "PHYSICS: RUNNING  |  SPEED: 1x  |  1:0.25x 2:0.5x 3:1x 4:2x  P: PAUSE/RESUME  N: STEP",
+            "PHYSICS: RUNNING  |  SPEED: 1x  |  SUBSTEPS: 6  |  1-4: SPEED  5:1 6:2 7:4 8:8 SUBSTEPS  P: PAUSE/RESUME  N: STEP",
         ),
         TextFont {
             font_size: FontSize::Px(16.0),
@@ -53,7 +59,7 @@ fn spawn_physics_controls_help(mut commands: Commands) {
 /// Handles input in an exclusive system because stepping must run Avian's
 /// complete physics schedule exactly once while its normal clock is paused.
 fn handle_physics_controls(world: &mut World) {
-    let (toggle_pause, step, selected_speed) = {
+    let (toggle_pause, step, selected_speed, selected_substeps) = {
         let input = world.resource::<ButtonInput<KeyCode>>();
         (
             input.just_pressed(PAUSE_KEY),
@@ -61,6 +67,9 @@ fn handle_physics_controls(world: &mut World) {
             SPEED_KEYS
                 .iter()
                 .find_map(|(key, speed)| input.just_pressed(*key).then_some(*speed)),
+            SUBSTEP_KEYS
+                .iter()
+                .find_map(|(key, count)| input.just_pressed(*key).then_some(*count)),
         )
     };
 
@@ -68,6 +77,9 @@ fn handle_physics_controls(world: &mut World) {
         world
             .resource_mut::<Time<Physics>>()
             .set_relative_speed(speed);
+    }
+    if let Some(substeps) = selected_substeps {
+        world.resource_mut::<SubstepCount>().0 = substeps;
     }
 
     if toggle_pause {
@@ -97,6 +109,7 @@ fn handle_physics_controls(world: &mut World) {
 
 fn update_physics_status(
     physics_time: Res<Time<Physics>>,
+    substeps: Res<SubstepCount>,
     mut status: Query<&mut Text, With<PhysicsStatusText>>,
 ) {
     let state = if physics_time.is_paused() {
@@ -107,7 +120,8 @@ fn update_physics_status(
     let speed = physics_time.relative_speed();
     for mut text in &mut status {
         **text = format!(
-            "PHYSICS: {state}  |  SPEED: {speed}x  |  1:0.25x 2:0.5x 3:1x 4:2x  P: PAUSE/RESUME  N: STEP"
+            "PHYSICS: {state}  |  SPEED: {speed}x  |  SUBSTEPS: {}  |  1-4: SPEED  5:1 6:2 7:4 8:8 SUBSTEPS  P: PAUSE/RESUME  N: STEP",
+            substeps.0
         );
     }
 }
@@ -222,6 +236,62 @@ mod tests {
             app.world().resource::<Time<Physics>>().relative_speed(),
             0.25
         );
+    }
+
+    #[test]
+    fn substep_settings_can_be_repeated_without_corrupting_bodies() {
+        let (mut app, body) = physics_app();
+        let second_body = app
+            .world_mut()
+            .spawn((
+                RigidBody::Dynamic,
+                Collider::sphere(0.5),
+                Position(Vec3::new(1.0, 100.0, 0.0)),
+                Transform::from_xyz(1.0, 100.0, 0.0),
+                LinearVelocity::default(),
+                Name::new("Substep control joint test body"),
+            ))
+            .id();
+        app.world_mut().spawn(
+            FixedJoint::new(body, second_body)
+                .with_local_anchor1(Vec3::X * 0.5)
+                .with_local_anchor2(Vec3::NEG_X * 0.5),
+        );
+        let mut previous_x = position(&app, body).x;
+
+        for (key, expected_count) in SUBSTEP_KEYS {
+            press(&mut app, key);
+            assert_eq!(app.world().resource::<SubstepCount>().0, expected_count);
+
+            for _ in 0..4 {
+                app.update();
+            }
+
+            let entity = app.world().entity(body);
+            let current_x = entity.get::<Position>().unwrap().x;
+            assert!(
+                current_x > previous_x,
+                "body stopped at {expected_count} substeps"
+            );
+            assert!(current_x.is_finite());
+            assert!(entity.get::<LinearVelocity>().unwrap().0.is_finite());
+            let second_position = position(&app, second_body);
+            assert!(second_position.is_finite());
+            let joint_distance = current_x - second_position.x;
+            assert!(
+                (joint_distance.abs() - 1.0).abs() < 0.1,
+                "joint drifted to {joint_distance} at {expected_count} substeps"
+            );
+            previous_x = current_x;
+        }
+
+        for (key, expected_count) in SUBSTEP_KEYS.into_iter().rev() {
+            press(&mut app, key);
+            assert_eq!(app.world().resource::<SubstepCount>().0, expected_count);
+            app.update();
+            assert!(position(&app, body).x > previous_x);
+            previous_x = position(&app, body).x;
+        }
     }
 
     #[test]

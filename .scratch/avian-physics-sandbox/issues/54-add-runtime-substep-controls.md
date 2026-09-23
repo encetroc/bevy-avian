@@ -4,14 +4,14 @@
 
 **Blocked by:** 52
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] The active substep setting is visible.
-- [ ] A scenario can be run repeatedly at each setting.
+- [x] The active substep setting is visible.
+- [x] A scenario can be run repeatedly at each setting.
 
 ## Tests
 
-- [ ] Compare a thin stack or joint structure at each setting.
-- [ ] Verify changing substeps does not corrupt existing bodies.
+- [x] Compare a thin joint structure at each setting.
+- [x] Verify changing substeps does not corrupt existing bodies.

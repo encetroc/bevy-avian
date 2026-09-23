@@ -4,14 +4,14 @@
 
 **Blocked by:** 09
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] The ray follows cursor movement.
-- [ ] Displayed hit data corresponds to the first collider hit.
+- [x] The ray follows cursor movement.
+- [x] Displayed hit data corresponds to the first collider hit.
 
 ## Tests
 
-- [ ] Aim at several colliders and empty space.
-- [ ] Compare ray hits with hover selection.
+- [x] Aim at several colliders and empty space.
+- [x] Compare ray hits with hover selection.

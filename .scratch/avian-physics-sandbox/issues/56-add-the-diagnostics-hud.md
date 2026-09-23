@@ -4,14 +4,14 @@
 
 **Blocked by:** 51, 52
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] The HUD updates during normal simulation.
-- [ ] Metrics remain usable during stress tests.
+- [x] The HUD updates during normal simulation.
+- [x] Metrics remain usable during stress tests.
 
 ## Tests
 
-- [ ] Compare metrics before and after spawning bodies.
-- [ ] Pause the simulation and verify timing/state labels remain coherent.
+- [x] Compare metrics before and after spawning bodies (headless test).
+- [x] Pause the simulation and verify timing/state labels remain coherent (headless test).

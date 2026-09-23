@@ -12,6 +12,7 @@ mod collision_layers;
 mod cursor_hover;
 mod damping_station;
 mod density_mass_station;
+mod diagnostics_hud;
 mod distance_joint_station;
 mod dynamic_objects;
 mod fixed_joint_station;
@@ -56,6 +57,7 @@ use collision_layers::{CollisionLayerDemoPlugin, SandboxLayer, layers_for};
 use cursor_hover::CursorHoverPlugin;
 use damping_station::DampingStationPlugin;
 use density_mass_station::DensityMassStationPlugin;
+use diagnostics_hud::DiagnosticsHudPlugin;
 use distance_joint_station::DistanceJointStationPlugin;
 use dynamic_objects::DynamicObjectsPlugin;
 use fixed_joint_station::FixedJointStationPlugin;
@@ -106,6 +108,7 @@ fn main() {
             ObjectGrabbingPlugin,
             PlayerPlugin,
         ))
+        .add_plugins(DiagnosticsHudPlugin)
         .add_plugins(InterpolationComparisonPlugin)
         .add_plugins((StationLayoutPlugin, CcdLauncherPlugin, RotationalCcdPlugin))
         .add_plugins((IntersectionTestingPlugin, PointProjectionPlugin))

@@ -4,14 +4,14 @@
 
 **Blocked by:** 36
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] Sensor volumes do not physically block bodies.
-- [ ] Entry and exit events appear in the event log.
+- [x] Sensor volumes do not physically block bodies.
+- [x] Entry and exit events appear in the event log.
 
 ## Tests
 
-- [ ] Move the player and an object through a sensor.
-- [ ] Verify crossing the boundary in both directions produces events.
+- [x] Headless test moves a kinematic player and dynamic object through the sensor.
+- [x] Headless test verifies crossing the boundary in both directions produces ENTER and EXIT events.

@@ -4,14 +4,14 @@
 
 **Blocked by:** 56
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] Validation can be enabled without changing normal defaults.
-- [ ] Validation output is visible to developers without crashing the sandbox.
+- [x] Validation can be enabled without changing normal defaults (`dev-physics-validation` Cargo feature; disabled by default).
+- [x] Validation mode is reported in the console and diagnostics HUD; the headless physics smoke test runs without a crash.
 
 ## Tests
 
-- [ ] Run the application with validation enabled.
-- [ ] Exercise representative stations and confirm diagnostics remain available.
+- [x] Run the Bevy physics app headlessly with validation enabled (no GUI/window, as required).
+- [x] Run the full headless station suite with validation enabled; diagnostics HUD data remains available in smoke and stress tests.

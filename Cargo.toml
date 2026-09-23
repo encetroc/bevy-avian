@@ -6,6 +6,7 @@ edition = "2024"
 [features]
 default = ["parallel-physics"]
 parallel-physics = ["avian3d/parallel"]
+dev-physics-validation = ["avian3d/validate"]
 
 [dependencies]
 avian3d = { version = "0.7.0", default-features = false, features = [

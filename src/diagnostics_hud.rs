@@ -16,6 +16,9 @@ pub(crate) struct DiagnosticsHudPlugin;
 
 impl Plugin for DiagnosticsHudPlugin {
     fn build(&self, app: &mut App) {
+        #[cfg(feature = "dev-physics-validation")]
+        info!("Avian physics validation enabled (dev-physics-validation)");
+
         app.add_plugins((
             FrameTimeDiagnosticsPlugin::default(),
             PhysicsDiagnosticsPlugin,
@@ -107,8 +110,13 @@ fn update_diagnostics_hud(
     let fixed_ms = metrics.fixed_time.timestep().as_secs_f64() * 1_000.0;
 
     for mut text in &mut hud {
+        let validation = if cfg!(feature = "dev-physics-validation") {
+            "ENABLED"
+        } else {
+            "disabled"
+        };
         **text = format!(
-            "DIAGNOSTICS\nFPS: {fps}  |  FRAME: {frame_ms} ms\nBODIES: {} dynamic ({} sleeping)\nCOLLIDERS: {}  |  CONTACTS: {} last step\nENTITIES: {}\nPHYSICS: {physics_ms:.2} ms last step  |  FIXED: {fixed_ms:.2} ms  |  {state} {speed}x  |  SUBSTEPS: {}",
+            "DIAGNOSTICS\nPHYSICS VALIDATION: {validation}\nFPS: {fps}  |  FRAME: {frame_ms} ms\nBODIES: {} dynamic ({} sleeping)\nCOLLIDERS: {}  |  CONTACTS: {} last step\nENTITIES: {}\nPHYSICS: {physics_ms:.2} ms last step  |  FIXED: {fixed_ms:.2} ms  |  {state} {speed}x  |  SUBSTEPS: {}",
             counts.dynamic_bodies,
             counts.sleeping_bodies,
             counts.colliders,
@@ -123,7 +131,7 @@ fn update_diagnostics_hud(
 mod tests {
     use std::time::Duration;
 
-    use avian3d::prelude::PhysicsPlugins;
+    use avian3d::prelude::{PhysicsPlugins, Position};
     use bevy::{mesh::MeshPlugin, time::TimeUpdateStrategy};
 
     use super::*;
@@ -174,6 +182,10 @@ mod tests {
         assert!(text.contains("FPS:"));
         assert!(text.contains("CONTACTS:"));
         assert!(text.contains("PHYSICS:"));
+        assert_eq!(
+            text.contains("PHYSICS VALIDATION: ENABLED"),
+            cfg!(feature = "dev-physics-validation")
+        );
     }
 
     #[test]
@@ -195,6 +207,39 @@ mod tests {
         assert_eq!(snapshot.colliders, baseline.colliders + 512);
         assert_eq!(snapshot.entities, baseline.entities + 512);
         assert!(hud_text(&mut app).contains("BODIES: 512 dynamic"));
+    }
+
+    #[test]
+    fn representative_physics_scene_keeps_validation_and_diagnostics_available() {
+        let mut app = diagnostics_app();
+        app.world_mut().spawn((
+            RigidBody::Static,
+            Collider::cuboid(10.0, 1.0, 10.0),
+            Position(Vec3::new(0.0, -0.5, 0.0)),
+            Transform::from_xyz(0.0, -0.5, 0.0),
+            Name::new("validation smoke-test floor"),
+        ));
+        let body = app
+            .world_mut()
+            .spawn((
+                RigidBody::Dynamic,
+                Collider::sphere(0.5),
+                Position(Vec3::Y * 2.0),
+                Transform::from_translation(Vec3::Y * 2.0),
+                Name::new("validation smoke-test body"),
+            ))
+            .id();
+
+        for _ in 0..30 {
+            app.update();
+        }
+
+        let position = app.world().get::<Position>(body).unwrap().0;
+        assert!(position.is_finite());
+        let text = hud_text(&mut app);
+        assert!(text.contains("PHYSICS VALIDATION:"));
+        assert!(text.contains("CONTACTS:"));
+        assert!(text.contains("PHYSICS:"));
     }
 
     #[test]

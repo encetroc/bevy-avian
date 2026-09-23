@@ -4,14 +4,14 @@
 
 **Blocked by:** 39
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] The custom rule is isolated to its demonstration.
-- [ ] Changing the activation state changes collision behavior.
+- [x] The custom rule is isolated to its demonstration.
+- [x] Changing the activation state changes collision behavior.
 
 ## Tests
 
-- [ ] Move a ghost through ordinary bodies before and after activation.
-- [ ] Verify ordinary collisions remain unchanged elsewhere.
+- [x] Move a ghost through ordinary bodies before and after activation.
+- [x] Verify ordinary collisions remain unchanged elsewhere.

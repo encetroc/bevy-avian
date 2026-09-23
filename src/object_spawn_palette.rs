@@ -4,6 +4,7 @@ use bevy::{ecs::system::SystemParam, prelude::*};
 use crate::{
     collision_layers::{SandboxLayer, layers_for},
     cursor_hover::CursorRay,
+    object_inspector::SelectionState,
     player::Player,
 };
 
@@ -126,6 +127,7 @@ impl Plugin for ObjectSpawnPalettePlugin {
                 (
                     toggle_palette,
                     spawn_from_controls,
+                    manage_spawned_objects,
                     update_palette_visibility,
                 )
                     .chain(),
@@ -138,6 +140,9 @@ struct SpawnPresetButton(SpawnPreset);
 
 #[derive(Component)]
 struct SpawnPalettePanel;
+
+#[derive(Component)]
+struct ClearSpawnedButton;
 
 fn spawn_palette_ui(mut commands: Commands) {
     commands
@@ -189,12 +194,60 @@ fn spawn_palette_ui(mut commands: Commands) {
                         TextColor(PANEL_TEXT),
                     ));
             }
+            parent
+                .spawn((
+                    Button,
+                    ClearSpawnedButton,
+                    Node {
+                        width: percent(100),
+                        height: px(30.0),
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
+                        margin: UiRect::top(px(6.0)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.38, 0.12, 0.12)),
+                    Name::new("Clear spawned objects"),
+                ))
+                .with_child((
+                    Text::new("Clear spawned objects"),
+                    TextFont::from_font_size(12.0),
+                    TextColor(PANEL_TEXT),
+                ));
         });
 }
 
 fn toggle_palette(keyboard: Res<ButtonInput<KeyCode>>, mut state: ResMut<SpawnPaletteState>) {
     if keyboard.just_pressed(KeyCode::Tab) {
         state.open = !state.open;
+    }
+}
+
+fn manage_spawned_objects(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    buttons: Query<&Interaction, (With<ClearSpawnedButton>, Changed<Interaction>)>,
+    mut selection: ResMut<SelectionState>,
+    spawned: Query<Entity, With<SpawnedSandboxObject>>,
+    mut commands: Commands,
+) {
+    let clear_requested = buttons
+        .iter()
+        .any(|interaction| *interaction == Interaction::Pressed);
+    let selected = selection.entity;
+
+    if clear_requested {
+        for entity in &spawned {
+            commands.entity(entity).despawn();
+        }
+        if selected.is_some_and(|entity| spawned.contains(entity)) {
+            selection.entity = None;
+        }
+    } else if keyboard.just_pressed(KeyCode::Delete)
+        && let Some(entity) = selected
+        && spawned.contains(entity)
+    {
+        commands.entity(entity).despawn();
+        selection.entity = None;
     }
 }
 
@@ -342,6 +395,7 @@ mod tests {
             ObjectSpawnPalettePlugin,
         ))
         .init_resource::<CursorRay>()
+        .init_resource::<SelectionState>()
         .init_resource::<Assets<StandardMaterial>>()
         .insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_secs_f32(
             1.0 / 60.0,
@@ -500,6 +554,70 @@ mod tests {
             );
         }
         assert_eq!(spawned(&mut app).len(), SpawnPreset::ALL.len());
+    }
+
+    #[test]
+    fn delete_removes_only_the_selected_spawned_object() {
+        let mut app = palette_app();
+        app.update();
+        let selected = app
+            .world_mut()
+            .spawn(SpawnedSandboxObject {
+                preset: SpawnPreset::Cube,
+            })
+            .id();
+        let unselected = app
+            .world_mut()
+            .spawn(SpawnedSandboxObject {
+                preset: SpawnPreset::Ball,
+            })
+            .id();
+        let protected = app.world_mut().spawn(Name::new("Arena floor")).id();
+        app.world_mut().resource_mut::<SelectionState>().entity = Some(selected);
+
+        press_key(&mut app, KeyCode::Delete);
+
+        assert!(app.world().get_entity(selected).is_err());
+        assert!(app.world().get_entity(unselected).is_ok());
+        assert!(app.world().get_entity(protected).is_ok());
+        assert_eq!(app.world().resource::<SelectionState>().entity, None);
+
+        app.world_mut().resource_mut::<SelectionState>().entity = Some(protected);
+        release_key(&mut app, KeyCode::Delete);
+        press_key(&mut app, KeyCode::Delete);
+        assert!(app.world().get_entity(protected).is_ok());
+        assert_eq!(
+            app.world().resource::<SelectionState>().entity,
+            Some(protected)
+        );
+    }
+
+    #[test]
+    fn clear_button_removes_spawned_objects_but_preserves_world_geometry() {
+        let mut app = palette_app();
+        app.update();
+        for preset in [
+            SpawnPreset::Cube,
+            SpawnPreset::Barrel,
+            SpawnPreset::BouncyBall,
+        ] {
+            app.world_mut().spawn(SpawnedSandboxObject { preset });
+        }
+        let protected = app.world_mut().spawn(Name::new("Arena wall")).id();
+        let button = {
+            let world = app.world_mut();
+            let mut buttons = world.query_filtered::<Entity, With<ClearSpawnedButton>>();
+            buttons.single(world).unwrap()
+        };
+        *app.world_mut()
+            .entity_mut(button)
+            .get_mut::<Interaction>()
+            .unwrap() = Interaction::Pressed;
+
+        app.update();
+
+        assert!(spawned(&mut app).is_empty());
+        assert!(app.world().get_entity(protected).is_ok());
     }
 
     #[test]

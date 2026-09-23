@@ -4,14 +4,14 @@
 
 **Blocked by:** 61
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] Delete removes only the selected removable object.
-- [ ] Clear removes spawned objects without removing protected world geometry.
+- [x] Delete removes only the selected removable object.
+- [x] Clear removes spawned objects without removing protected world geometry.
 
 ## Tests
 
-- [ ] Delete selected and unselected objects.
-- [ ] Use Clear after spawning multiple object types and inspect the arena.
+- [x] Delete selected and unselected objects.
+- [x] Use Clear after spawning multiple object types and verify protected arena geometry remains.

@@ -4,14 +4,14 @@
 
 **Blocked by:** 03, 06
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] All listed structures are navigable and collidable.
-- [ ] The area supports unrestricted object experimentation.
+- [x] Floors, ramps, stairs, walls, shelves, tables, and platforms are present with static collision; headless tests verify the player can cross the expanded course and dynamic objects land on the ramp, stairs, platform, table, and upper shelf.
+- [x] The expanded area provides open space for unrestricted object experimentation.
 
 ## Tests
 
-- [ ] Walk through the entire area.
-- [ ] Spawn or carry objects across ramps, stairs, shelves, and platforms.
+- [x] Headless player movement test crosses the full free-sandbox course without a visible window.
+- [x] Headless physics tests drop objects onto the ramp, stairs, platform, table, and upper shelf; all course structures are verified as static colliders.

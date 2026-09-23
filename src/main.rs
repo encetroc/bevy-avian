@@ -18,6 +18,7 @@ mod distance_joint_station;
 mod dynamic_objects;
 mod fixed_joint_station;
 mod force_station;
+mod free_sandbox;
 mod friction_station;
 mod gravity_controls;
 mod interpolation_comparison;
@@ -65,6 +66,7 @@ use distance_joint_station::DistanceJointStationPlugin;
 use dynamic_objects::DynamicObjectsPlugin;
 use fixed_joint_station::FixedJointStationPlugin;
 use force_station::ForceStationPlugin;
+use free_sandbox::FreeSandboxPlugin;
 use friction_station::FrictionStationPlugin;
 use gravity_controls::GravityControlsPlugin;
 use interpolation_comparison::InterpolationComparisonPlugin;
@@ -116,7 +118,12 @@ fn main() {
         .add_plugins(DiagnosticsHudPlugin)
         .add_plugins(CountedBodySpawningPlugin)
         .add_plugins(InterpolationComparisonPlugin)
-        .add_plugins((StationLayoutPlugin, CcdLauncherPlugin, RotationalCcdPlugin))
+        .add_plugins((
+            StationLayoutPlugin,
+            FreeSandboxPlugin,
+            CcdLauncherPlugin,
+            RotationalCcdPlugin,
+        ))
         .add_plugins((IntersectionTestingPlugin, PointProjectionPlugin))
         .add_plugins((
             SpatialQueryFiltersPlugin,
@@ -160,8 +167,10 @@ impl Plugin for SandboxPlugin {
     }
 }
 
-/// Half the width and depth of the walkable area, in world units.
+/// Half the width and negative-Z depth of the arena, in world units.
 pub const ARENA_HALF_EXTENT: f32 = 10.0;
+/// Positive-Z boundary of the arena, extended to make room for the free sandbox.
+pub const ARENA_POSITIVE_Z_EXTENT: f32 = 22.0;
 /// Thickness of the floor and enclosing walls.
 pub const ARENA_WALL_THICKNESS: f32 = 0.5;
 /// Height of each enclosing wall above the floor.
@@ -224,12 +233,16 @@ fn spawn_physics_arena(
     let floor_size = Vec3::new(
         ARENA_HALF_EXTENT * 2.0 + ARENA_WALL_THICKNESS * 2.0,
         ARENA_WALL_THICKNESS,
-        ARENA_HALF_EXTENT * 2.0 + ARENA_WALL_THICKNESS * 2.0,
+        ARENA_POSITIVE_Z_EXTENT + ARENA_HALF_EXTENT + ARENA_WALL_THICKNESS * 2.0,
     );
     spawn_box(
         &mut commands,
         "Arena Floor",
-        Vec3::new(0.0, -ARENA_WALL_THICKNESS * 0.5, 0.0),
+        Vec3::new(
+            0.0,
+            -ARENA_WALL_THICKNESS * 0.5,
+            (ARENA_POSITIVE_Z_EXTENT - ARENA_HALF_EXTENT) * 0.5,
+        ),
         floor_size,
         RigidBody::Static,
         Some(ArenaFloor),
@@ -237,28 +250,38 @@ fn spawn_physics_arena(
         wall_visuals,
     );
 
-    let wall_center = ARENA_HALF_EXTENT + ARENA_WALL_THICKNESS * 0.5;
+    let wall_center_x = ARENA_HALF_EXTENT + ARENA_WALL_THICKNESS * 0.5;
+    let wall_center_z_negative = ARENA_HALF_EXTENT + ARENA_WALL_THICKNESS * 0.5;
+    let wall_center_z_positive = ARENA_POSITIVE_Z_EXTENT + ARENA_WALL_THICKNESS * 0.5;
     let wall_size_x = Vec3::new(ARENA_WALL_THICKNESS, ARENA_WALL_HEIGHT, floor_size.z);
     let wall_size_z = Vec3::new(floor_size.x, ARENA_WALL_HEIGHT, ARENA_WALL_THICKNESS);
     for (name, position, size) in [
         (
             "Arena Wall +X",
-            Vec3::new(wall_center, ARENA_WALL_HEIGHT * 0.5, 0.0),
+            Vec3::new(
+                wall_center_x,
+                ARENA_WALL_HEIGHT * 0.5,
+                (ARENA_POSITIVE_Z_EXTENT - ARENA_HALF_EXTENT) * 0.5,
+            ),
             wall_size_x,
         ),
         (
             "Arena Wall -X",
-            Vec3::new(-wall_center, ARENA_WALL_HEIGHT * 0.5, 0.0),
+            Vec3::new(
+                -wall_center_x,
+                ARENA_WALL_HEIGHT * 0.5,
+                (ARENA_POSITIVE_Z_EXTENT - ARENA_HALF_EXTENT) * 0.5,
+            ),
             wall_size_x,
         ),
         (
             "Arena Wall +Z",
-            Vec3::new(0.0, ARENA_WALL_HEIGHT * 0.5, wall_center),
+            Vec3::new(0.0, ARENA_WALL_HEIGHT * 0.5, wall_center_z_positive),
             wall_size_z,
         ),
         (
             "Arena Wall -Z",
-            Vec3::new(0.0, ARENA_WALL_HEIGHT * 0.5, -wall_center),
+            Vec3::new(0.0, ARENA_WALL_HEIGHT * 0.5, -wall_center_z_negative),
             wall_size_z,
         ),
     ] {
@@ -441,8 +464,13 @@ mod tests {
 
             let final_position = app.world().entity(body).get::<Position>().unwrap().0;
             let distance_to_wall = direction.dot(final_position);
+            let boundary = if direction == Vec3::Z {
+                ARENA_POSITIVE_Z_EXTENT
+            } else {
+                ARENA_HALF_EXTENT
+            };
             assert!(
-                distance_to_wall <= ARENA_HALF_EXTENT - ARENA_TEST_BODY_SIZE * 0.5 + 0.2,
+                distance_to_wall <= boundary - ARENA_TEST_BODY_SIZE * 0.5 + 0.2,
                 "body escaped toward {direction:?}: {final_position:?}"
             );
         }

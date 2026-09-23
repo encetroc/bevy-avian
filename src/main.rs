@@ -3,6 +3,7 @@ use bevy::prelude::*;
 
 mod axis_locks_station;
 mod camera;
+mod ccd_launcher;
 mod collider_debug;
 mod collider_shape_station;
 mod collision_event_log;
@@ -43,6 +44,7 @@ use axis_locks_station::AxisLocksStationPlugin;
 use camera::CameraFollowPlugin;
 #[cfg(test)]
 use camera::FixedFollowCamera;
+use ccd_launcher::CcdLauncherPlugin;
 use collider_debug::ColliderDebugPlugin;
 use collider_shape_station::ColliderShapeStationPlugin;
 use collision_event_log::CollisionEventLogPlugin;
@@ -96,8 +98,8 @@ fn main() {
             GravityControlsPlugin,
             ObjectGrabbingPlugin,
             PlayerPlugin,
-            StationLayoutPlugin,
         ))
+        .add_plugins((StationLayoutPlugin, CcdLauncherPlugin))
         .add_plugins((IntersectionTestingPlugin, PointProjectionPlugin))
         .add_plugins((
             SpatialQueryFiltersPlugin,

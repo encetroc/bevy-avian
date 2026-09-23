@@ -35,6 +35,8 @@ mod object_composition;
 mod object_grabbing;
 mod object_inspector;
 mod object_spawn_palette;
+#[cfg(test)]
+mod parallel_physics_comparison;
 mod physics_controls;
 mod picking_comparison;
 mod player;

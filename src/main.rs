@@ -23,6 +23,7 @@ mod object_composition;
 mod object_grabbing;
 mod object_inspector;
 mod player;
+mod point_projection;
 mod prismatic_joint_station;
 mod raycaster_station;
 mod restitution_station;
@@ -60,6 +61,7 @@ use object_composition::ObjectCompositionPlugin;
 use object_grabbing::ObjectGrabbingPlugin;
 use object_inspector::ObjectInspectorPlugin;
 use player::PlayerPlugin;
+use point_projection::PointProjectionPlugin;
 use prismatic_joint_station::PrismaticJointStationPlugin;
 use raycaster_station::RayCasterStationPlugin;
 use restitution_station::RestitutionStationPlugin;
@@ -92,6 +94,7 @@ fn main() {
             PlayerPlugin,
             StationLayoutPlugin,
         ))
+        .add_plugins(PointProjectionPlugin)
         .add_plugins((
             RayCasterStationPlugin,
             ShapeCastStationPlugin,

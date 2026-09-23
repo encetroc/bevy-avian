@@ -15,6 +15,8 @@ mod cursor_hover;
 mod custom_constraint_station;
 mod damping_station;
 mod density_mass_station;
+#[cfg(test)]
+mod deterministic_replay;
 mod diagnostics_hud;
 mod distance_joint_station;
 mod dynamic_objects;

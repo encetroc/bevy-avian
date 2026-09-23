@@ -4,14 +4,14 @@
 
 **Blocked by:** 49
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] The rotating body can be tested repeatedly.
-- [ ] Linear and nonlinear swept modes can be compared where available.
+- [x] The rotating body can be tested repeatedly.
+- [x] Linear and nonlinear swept modes can be compared where available.
 
 ## Tests
 
-- [ ] Run the test with each supported mode.
-- [ ] Verify the result is visible in debug rendering.
+- [x] Run the test with each supported mode.
+- [x] Verify the result is visible in debug rendering.

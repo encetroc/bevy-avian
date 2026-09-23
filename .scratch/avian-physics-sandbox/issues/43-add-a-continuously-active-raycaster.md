@@ -4,14 +4,14 @@
 
 **Blocked by:** 42
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Acceptance criteria
 
-- [ ] The component updates without manual query calls.
-- [ ] The current hit result is visible in the station.
+- [x] The component updates without manual query calls.
+- [x] The current hit result is visible in the station.
 
 ## Tests
 
-- [ ] Move the caster across multiple surfaces.
-- [ ] Remove the target and verify the result clears.
+- [x] Move the caster across multiple surfaces.
+- [x] Remove the target and verify the result clears.

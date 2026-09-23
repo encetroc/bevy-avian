@@ -4,14 +4,14 @@
 
 **Blocked by:** 36, 13
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] Contact data updates while the collision is active.
-- [ ] The inspector identifies the other entity.
+- [x] Contact data updates while the collision is active.
+- [x] The inspector identifies the other entity.
 
 ## Tests
 
-- [ ] Select an object resting on the floor.
-- [ ] Compare contact normal and relative speed before and after impact.
+- [x] Headless test selects an object resting against a named floor and reports its contact.
+- [x] Headless test verifies contact position, normal, relative speed, impulse, and live refresh.

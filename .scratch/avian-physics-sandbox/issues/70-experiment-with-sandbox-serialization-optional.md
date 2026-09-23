@@ -4,14 +4,14 @@
 
 **Blocked by:** 61, 64, 67
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] A sandbox snapshot can be written and loaded.
-- [ ] Reloaded objects preserve the supported serialized properties.
+- [x] A sandbox snapshot can be written and loaded.
+- [x] Reloaded objects preserve the supported serialized properties.
 
 ## Tests
 
-- [ ] Save a mixed sandbox, alter it, and reload.
-- [ ] Compare transforms, materials, and container amounts before and after.
+- [x] Save a mixed sandbox, alter it, and reload.
+- [x] Compare transforms, materials, and container amounts before and after.

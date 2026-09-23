@@ -1,5 +1,6 @@
 use avian3d::prelude::*;
 use bevy::{ecs::system::SystemParam, prelude::*};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     breakable_objects::BreakableObject,
@@ -17,7 +18,7 @@ const PANEL_TEXT: Color = Color::srgb(0.87, 0.92, 0.98);
 const CONTROL_BACKGROUND: Color = Color::srgb(0.12, 0.18, 0.28);
 
 /// The nine reusable objects available from the free-sandbox developer palette.
-#[derive(Component, Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Component, Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum SpawnPreset {
     Cube,
     Ball,
@@ -57,7 +58,7 @@ impl SpawnPreset {
         }
     }
 
-    const fn dimensions(self) -> Vec3 {
+    pub(crate) const fn dimensions(self) -> Vec3 {
         match self {
             Self::Cube | Self::HeavyBlock => Vec3::splat(0.8),
             Self::Ball | Self::BouncyBall => Vec3::splat(0.9),
@@ -68,7 +69,7 @@ impl SpawnPreset {
         }
     }
 
-    const fn color(self) -> Color {
+    pub(crate) const fn color(self) -> Color {
         match self {
             Self::Cube => Color::srgb(0.22, 0.66, 0.95),
             Self::Ball => Color::srgb(0.95, 0.34, 0.27),
@@ -102,7 +103,7 @@ impl SpawnPreset {
         }
     }
 
-    fn collider(self) -> Collider {
+    pub(crate) fn collider(self) -> Collider {
         let dimensions = self.dimensions();
         match self {
             Self::Ball | Self::BouncyBall => Collider::sphere(dimensions.x * 0.5),
@@ -116,7 +117,7 @@ impl SpawnPreset {
         }
     }
 
-    fn mesh(self) -> Mesh {
+    pub(crate) fn mesh(self) -> Mesh {
         let dimensions = self.dimensions();
         match self {
             Self::Ball | Self::BouncyBall => Sphere::new(dimensions.x * 0.5).into(),
@@ -201,7 +202,9 @@ fn spawn_palette_ui(mut commands: Commands) {
                 TextColor(PANEL_TEXT),
             ));
             parent.spawn((
-                Text::new("Choose an object or press its number."),
+                Text::new(
+                    "Choose an object or number. F5 saves; F9 reloads sandbox-snapshot.json.",
+                ),
                 TextFont::from_font_size(11.0),
                 TextColor(PANEL_TEXT),
             ));

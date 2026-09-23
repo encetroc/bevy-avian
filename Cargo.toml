@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 avian3d = { version = "0.7.0", features = ["bevy_diagnostic"] }
 bevy = "0.19.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]

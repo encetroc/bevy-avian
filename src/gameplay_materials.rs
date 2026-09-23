@@ -1,8 +1,9 @@
 use avian3d::prelude::{ColliderDensity, Friction, Restitution};
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
 /// A gameplay material preset, intentionally separate from Avian physics components.
-#[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Component, Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum GameplayMaterial {
     Wood,
     Ceramic,

@@ -44,6 +44,7 @@ mod restitution_station;
 mod revolute_joint_station;
 mod rigid_body_station;
 mod rotational_ccd;
+mod sandbox_serialization;
 mod scene_collider_station;
 mod sensor_zones;
 mod shape_cast_station;
@@ -99,6 +100,7 @@ use restitution_station::RestitutionStationPlugin;
 use revolute_joint_station::RevoluteJointStationPlugin;
 use rigid_body_station::RigidBodyStationPlugin;
 use rotational_ccd::RotationalCcdPlugin;
+use sandbox_serialization::SandboxSerializationPlugin;
 use scene_collider_station::SceneColliderStationPlugin;
 use sensor_zones::SensorZonesPlugin;
 use shape_cast_station::ShapeCastStationPlugin;
@@ -134,6 +136,7 @@ fn main() {
             ObjectSpawnPalettePlugin,
             LiquidContainersPlugin,
             ResetControlsPlugin,
+            SandboxSerializationPlugin,
         ))
         .add_plugins(PickingComparisonPlugin)
         .add_plugins(DiagnosticsHudPlugin)

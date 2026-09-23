@@ -199,8 +199,14 @@ fn apply_spatial_query_filter_actions(
 
 fn update_spatial_query_filter_ui(
     state: Res<SpatialQueryFilterState>,
-    mut status: Query<&mut Text, With<SpatialQueryFilterStatus>>,
-    mut labels: Query<(&SpatialQueryFilterLabel, &mut Text)>,
+    mut status: Query<
+        &mut Text,
+        (
+            With<SpatialQueryFilterStatus>,
+            Without<SpatialQueryFilterLabel>,
+        ),
+    >,
+    mut labels: Query<(&SpatialQueryFilterLabel, &mut Text), Without<SpatialQueryFilterStatus>>,
     mut buttons: Query<(&Interaction, &mut BackgroundColor), With<SpatialQueryFilterControl>>,
 ) {
     if let Ok(mut status) = status.single_mut() {

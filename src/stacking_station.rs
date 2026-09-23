@@ -506,9 +506,16 @@ fn apply_sleeping_controls(
     }
 }
 
+type SleepingStatusBodies<'w, 's> = Query<
+    'w,
+    's,
+    (&'static RigidBody, Has<Sleeping>, Has<SleepingDisabled>),
+    With<StackingLabObject>,
+>;
+
 fn update_sleeping_status(
     state: Res<SleepingControlsState>,
-    bodies: Query<(&RigidBody, Has<Sleeping>, Has<SleepingDisabled>), With<StackingLabObject>>,
+    bodies: SleepingStatusBodies<'_, '_>,
     mut status: Query<&mut Text, With<SleepingStatusText>>,
 ) {
     let mut awake = 0;

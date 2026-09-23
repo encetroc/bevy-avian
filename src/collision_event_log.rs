@@ -124,6 +124,7 @@ fn record_collision_events(
     mut starts: MessageReader<CollisionStart>,
     mut ends: MessageReader<CollisionEnd>,
     contact_graph: Res<ContactGraph>,
+    sensors: Query<Entity, With<Sensor>>,
 ) {
     for event in starts.read() {
         let [first, second] =
@@ -145,6 +146,9 @@ fn record_collision_events(
     let touching_pairs: Vec<([Entity; 2], CollisionPairKey)> = contact_graph
         .iter_active_touching()
         .chain(contact_graph.iter_sleeping_touching())
+        // Sensor intersections produce ENTER/EXIT messages but never physical
+        // contact events. Keep them out of the contact-history bookkeeping.
+        .filter(|pair| !sensors.contains(pair.collider1) && !sensors.contains(pair.collider2))
         .map(|pair| {
             let participants = [
                 pair.body1.unwrap_or(pair.collider1),

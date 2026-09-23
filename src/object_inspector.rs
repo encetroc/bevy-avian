@@ -94,7 +94,9 @@ pub struct InspectorSnapshot {
     pub entity: Entity,
     pub name: String,
     pub body: RigidBody,
+    pub body_enabled: bool,
     pub collider: ColliderInfo,
+    pub collider_enabled: bool,
     pub position: Vec3,
     pub rotation: Quat,
     pub linear_velocity: Vec3,
@@ -326,6 +328,8 @@ fn apply_inspector_edits(
         Option<&mut Dominance>,
         Option<&mut LinearVelocity>,
         Option<&mut AngularVelocity>,
+        Option<&ColliderDisabled>,
+        Option<&RigidBodyDisabled>,
     )>,
     bodies: Query<&RigidBody>,
 ) {
@@ -342,6 +346,8 @@ fn apply_inspector_edits(
         mut dominance,
         mut linear_velocity,
         mut angular_velocity,
+        collider_disabled,
+        body_disabled,
     )) = properties.get_mut(entity)
     else {
         return;
@@ -448,6 +454,20 @@ fn apply_inspector_edits(
                     RigidBody::Static => RigidBody::Dynamic,
                 };
                 commands.entity(entity).insert(next_body);
+            }
+            InspectorControl::ToggleColliderEnabled => {
+                if collider_disabled.is_some() {
+                    commands.entity(entity).remove::<ColliderDisabled>();
+                } else {
+                    commands.entity(entity).insert(ColliderDisabled);
+                }
+            }
+            InspectorControl::ToggleBodyEnabled => {
+                if body_disabled.is_some() {
+                    commands.entity(entity).remove::<RigidBodyDisabled>();
+                } else {
+                    commands.entity(entity).insert(RigidBodyDisabled);
+                }
             }
             _ => {}
         }
@@ -699,6 +719,8 @@ fn refresh_inspector(
         Option<&Restitution>,
         Has<Sleeping>,
         Has<SleepingDisabled>,
+        Has<ColliderDisabled>,
+        Has<RigidBodyDisabled>,
     )>,
     joint_names: Query<&Name>,
     joints: JointInspectorQuery<'_, '_>,
@@ -728,6 +750,8 @@ fn refresh_inspector(
             restitution,
             sleeping,
             sleeping_disabled,
+            collider_disabled,
+            body_disabled,
         ) = body_details.get(entity).ok()?;
 
         let position = position
@@ -750,10 +774,12 @@ fn refresh_inspector(
                 .map(|name| name.as_str().to_owned())
                 .unwrap_or_else(|| format!("Physics Entity {entity:?}")),
             body: *body,
+            body_enabled: !body_disabled,
             collider: ColliderInfo {
                 shape: collider_shape_name(collider),
                 scale: collider.scale(),
             },
+            collider_enabled: !collider_disabled,
             position,
             rotation,
             linear_velocity: linear_velocity
@@ -998,6 +1024,8 @@ enum InspectorControl {
         step: StepDirection,
     },
     CycleBody,
+    ToggleColliderEnabled,
+    ToggleBodyEnabled,
     ToggleJointEnabled,
     DeleteJoint,
     JointAnchor {
@@ -1082,6 +1110,8 @@ enum InspectorValueProperty {
     AxisLock(AxisLockKind, Axis),
     Velocity(VelocityKind, Axis),
     Body,
+    ColliderEnabled,
+    BodyEnabled,
     Joint(JointValueProperty),
 }
 
@@ -1145,6 +1175,18 @@ fn spawn_inspector_ui(mut commands: Commands) {
                     spawn_scalar_row(parent, "Angular damping", ScalarProperty::AngularDamping);
                     spawn_scalar_row(parent, "Dominance", ScalarProperty::Dominance);
                     spawn_body_row(parent);
+                    spawn_enabled_row(
+                        parent,
+                        "Body enabled",
+                        InspectorControl::ToggleBodyEnabled,
+                        InspectorValueProperty::BodyEnabled,
+                    );
+                    spawn_enabled_row(
+                        parent,
+                        "Collider enabled",
+                        InspectorControl::ToggleColliderEnabled,
+                        InspectorValueProperty::ColliderEnabled,
+                    );
                     for kind in [AxisLockKind::Translation, AxisLockKind::Rotation] {
                         for axis in [Axis::X, Axis::Y, Axis::Z] {
                             spawn_axis_lock_row(parent, kind, axis);
@@ -1456,6 +1498,29 @@ fn spawn_body_row(parent: &mut ChildSpawnerCommands) {
     });
 }
 
+fn spawn_enabled_row(
+    parent: &mut ChildSpawnerCommands,
+    label: &'static str,
+    control: InspectorControl,
+    property: InspectorValueProperty,
+) {
+    parent.spawn(control_row_node()).with_children(|row| {
+        row.spawn(control_label(label));
+        spawn_control_button(row, "toggle", control);
+        row.spawn((
+            Text::new("-"),
+            TextFont::from_font_size(14.0),
+            TextColor(PANEL_TEXT),
+            InspectorValueText { property },
+            Node {
+                width: px(100.0),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+        ));
+    });
+}
+
 fn spawn_velocity_row(parent: &mut ChildSpawnerCommands, kind: VelocityKind, axis: Axis) {
     parent.spawn(control_row_node()).with_children(|row| {
         row.spawn(control_label(match axis {
@@ -1656,6 +1721,14 @@ fn format_inspector_value(inspector: &InspectorState, property: InspectorValuePr
             .object
             .as_ref()
             .map_or_else(|| "-".to_owned(), |object| format!("{:?}", object.body)),
+        InspectorValueProperty::ColliderEnabled => inspector.object.as_ref().map_or_else(
+            || "-".to_owned(),
+            |object| object.collider_enabled.to_string(),
+        ),
+        InspectorValueProperty::BodyEnabled => inspector
+            .object
+            .as_ref()
+            .map_or_else(|| "-".to_owned(), |object| object.body_enabled.to_string()),
         InspectorValueProperty::Joint(property) => {
             let Some(joint) = inspector.joint.as_ref() else {
                 return "-".to_owned();
@@ -1771,16 +1844,18 @@ fn format_inspector_text(object: &InspectorSnapshot) -> String {
     let contacts = format_contact_inspector_text(&object.contacts);
 
     format!(
-        "{}\nEntity: {:?}\n\nBODY\nType: {:?}\nMass: {}\nGravity scale: {}\nLinear damping: {}\nAngular damping: {}\nDominance: {}\nAxis locks: {}\n\nCOLLIDER\nShape: {}\nScale: {}\nFriction: {}\nRestitution: {}\n\nCURRENT STATE\nPosition: {}\nRotation: {}\nLinear velocity: {}\nAngular velocity: {}\nSleeping: {}\nSleeping disabled: {}\n\nCONTACTS (LIVE)\n{}",
+        "{}\nEntity: {:?}\n\nBODY\nType: {:?}\nEnabled: {}\nMass: {}\nGravity scale: {}\nLinear damping: {}\nAngular damping: {}\nDominance: {}\nAxis locks: {}\n\nCOLLIDER\nEnabled: {}\nShape: {}\nScale: {}\nFriction: {}\nRestitution: {}\n\nCURRENT STATE\nPosition: {}\nRotation: {}\nLinear velocity: {}\nAngular velocity: {}\nSleeping: {}\nSleeping disabled: {}\n\nCONTACTS (LIVE)\n{}",
         object.name,
         object.entity,
         object.body,
+        object.body_enabled,
         mass,
         format_float(object.gravity_scale),
         format_float(object.linear_damping),
         format_float(object.angular_damping),
         object.dominance,
         format_axis_locks(LockedAxes::from_bits(object.locked_axes)),
+        object.collider_enabled,
         object.collider.shape,
         format_vec3(object.collider.scale),
         friction,
@@ -2177,6 +2252,58 @@ mod tests {
             app.world().entity(body).get::<RigidBody>(),
             Some(&RigidBody::Dynamic)
         );
+    }
+
+    #[test]
+    fn enabled_controls_toggle_selected_body_and_collider() {
+        let mut app = inspector_app();
+        let body = editable_body(&mut app, Vec3::ZERO);
+        app.update();
+        select_entity(&mut app, body);
+
+        let snapshot = app
+            .world()
+            .resource::<InspectorState>()
+            .object
+            .as_ref()
+            .expect("selected body snapshot");
+        assert!(snapshot.body_enabled);
+        assert!(snapshot.collider_enabled);
+
+        press_control(&mut app, InspectorControl::ToggleColliderEnabled);
+        assert!(app.world().entity(body).contains::<ColliderDisabled>());
+        assert!(
+            !app.world()
+                .resource::<InspectorState>()
+                .object
+                .as_ref()
+                .unwrap()
+                .collider_enabled
+        );
+
+        press_control(&mut app, InspectorControl::ToggleBodyEnabled);
+        assert!(app.world().entity(body).contains::<RigidBodyDisabled>());
+        assert!(
+            !app.world()
+                .resource::<InspectorState>()
+                .object
+                .as_ref()
+                .unwrap()
+                .body_enabled
+        );
+
+        press_control(&mut app, InspectorControl::ToggleColliderEnabled);
+        press_control(&mut app, InspectorControl::ToggleBodyEnabled);
+        assert!(!app.world().entity(body).contains::<ColliderDisabled>());
+        assert!(!app.world().entity(body).contains::<RigidBodyDisabled>());
+        let snapshot = app
+            .world()
+            .resource::<InspectorState>()
+            .object
+            .as_ref()
+            .unwrap();
+        assert!(snapshot.body_enabled);
+        assert!(snapshot.collider_enabled);
     }
 
     #[test]

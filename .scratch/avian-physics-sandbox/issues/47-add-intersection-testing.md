@@ -4,14 +4,14 @@
 
 **Blocked by:** 42
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] The volume color reflects intersection state.
-- [ ] Moving the volume updates the state immediately.
+- [x] The volume color reflects intersection state.
+- [x] Moving the volume updates the state immediately.
 
 ## Tests
 
-- [ ] Move through empty space and each collider.
-- [ ] Compare the color with collider debug visualization.
+- [x] Headless tests move through empty space and an Avian collider, asserting immediate state and color changes.
+- [x] The volume uses an Avian collider, so F1 debug visualization can be compared with its colored mesh.

@@ -6,7 +6,12 @@ use crate::player::Player;
 
 const HOVER_COLOR: Color = Color::srgb(1.0, 0.9, 0.15);
 const UNREACHABLE_HOVER_COLOR: Color = Color::srgb(0.95, 0.2, 0.15);
+const RAY_COLOR: Color = Color::srgb(0.2, 0.8, 1.0);
+const RAY_HIT_COLOR: Color = Color::srgb(1.0, 0.65, 0.15);
+const SURFACE_NORMAL_COLOR: Color = Color::srgb(0.3, 1.0, 0.4);
 const HOVER_LABEL_HEIGHT: f32 = 0.35;
+const RAY_VISUAL_LENGTH: f32 = 30.0;
+const SURFACE_NORMAL_LENGTH: f32 = 0.75;
 
 /// The ray generated from the current cursor position.
 ///
@@ -70,6 +75,8 @@ pub struct HoverInfo {
     pub hit_position: Vec3,
     /// The distance from the camera ray origin to the hit.
     pub distance: f32,
+    /// The collider surface normal at the hit point, in world space.
+    pub normal: Vec3,
     /// Whether the player is close enough to start a grab.
     pub reachability: HoverReachability,
 }
@@ -97,7 +104,7 @@ impl Plugin for CursorHoverPlugin {
                     update_hover_state,
                     update_hover_reachability,
                     apply_hover_material,
-                    draw_hover_identity.run_if(resource_exists::<GizmoConfigStore>),
+                    draw_cursor_raycast.run_if(resource_exists::<GizmoConfigStore>),
                 )
                     .chain(),
             );
@@ -163,6 +170,7 @@ pub(crate) fn update_hover_state(
                     name,
                     hit_position: ray.origin + ray.direction * hit.distance,
                     distance: hit.distance,
+                    normal: hit.normal,
                     reachability: HoverReachability::Reachable,
                 }
             })
@@ -301,29 +309,65 @@ fn apply_hover_material(
     }
 }
 
-/// Displays the physical body's basic identity at the ray hit point.
-fn draw_hover_identity(mut gizmos: Gizmos, hover: Res<HoverState>) {
-    let Some(object) = hover.object.as_ref() else {
+/// Draws the camera ray and exposes the first physical collider hit.
+///
+/// The ray and hit details use the same [`CursorRay`] and [`HoverState`] that
+/// drive hover selection, so the visualization cannot report a different
+/// collider than the one selected by the interaction systems.
+fn draw_cursor_raycast(mut gizmos: Gizmos, cursor_ray: Res<CursorRay>, hover: Res<HoverState>) {
+    let Some(ray) = cursor_ray.ray else {
         return;
     };
-    let (label, color) = if object.reachability.is_reachable() {
-        (object.name.clone(), HOVER_COLOR)
-    } else {
-        (
-            format!("{} (unreachable)", object.name),
-            UNREACHABLE_HOVER_COLOR,
-        )
+
+    gizmos.ray(ray.origin, ray.direction * RAY_VISUAL_LENGTH, RAY_COLOR);
+
+    let Some(object) = hover.object.as_ref() else {
+        gizmos.text(
+            Isometry3d::new(
+                ray.origin + ray.direction * (RAY_VISUAL_LENGTH * 0.7),
+                Quat::IDENTITY,
+            ),
+            "RAYCAST: no hit",
+            0.4,
+            Vec2::ZERO,
+            RAY_COLOR,
+        );
+        return;
     };
 
+    let hit_color = if object.reachability.is_reachable() {
+        RAY_HIT_COLOR
+    } else {
+        UNREACHABLE_HOVER_COLOR
+    };
+    gizmos.cross(object.hit_position, 0.12, hit_color);
+    gizmos.arrow(
+        object.hit_position,
+        object.hit_position + object.normal * SURFACE_NORMAL_LENGTH,
+        SURFACE_NORMAL_COLOR,
+    );
+
+    let label = format!(
+        "RAYCAST HIT\nEntity: {} ({:?})\nDistance: {:.2} m\nPosition: ({:.2}, {:.2}, {:.2})\nNormal: ({:.2}, {:.2}, {:.2})",
+        object.name,
+        object.entity,
+        object.distance,
+        object.hit_position.x,
+        object.hit_position.y,
+        object.hit_position.z,
+        object.normal.x,
+        object.normal.y,
+        object.normal.z,
+    );
     gizmos.text(
         Isometry3d::new(
             object.hit_position + Vec3::Y * HOVER_LABEL_HEIGHT,
             Quat::IDENTITY,
         ),
         &label,
-        0.45,
+        0.4,
         Vec2::ZERO,
-        color,
+        hit_color,
     );
 }
 
@@ -412,7 +456,30 @@ mod tests {
             hover.as_ref().map(|object| object.name.as_str()),
             Some("Hover Cube")
         );
+        assert_eq!(hover.as_ref().map(|object| object.normal), Some(Vec3::Z));
         assert!(app.world().entity(body).contains::<HoverOriginalMaterial>());
+    }
+
+    #[test]
+    fn raycast_reports_first_hit_distance_position_and_surface_normal() {
+        let mut app = hover_app();
+        let near = spawn_body(&mut app, "Near Cube", Vec3::new(0.0, 0.0, -3.0));
+        let far = spawn_body(&mut app, "Far Cube", Vec3::new(0.0, 0.0, -6.0));
+        app.update();
+
+        point_cursor_at(&mut app, Vec3::new(0.0, 0.0, -6.0));
+
+        let hit = app
+            .world()
+            .resource::<HoverState>()
+            .object
+            .as_ref()
+            .expect("ray should hit the near body");
+        assert_eq!(hit.entity, near);
+        assert_ne!(hit.entity, far);
+        assert!((hit.distance - 2.75).abs() < 1e-4, "hit: {hit:?}");
+        assert!((hit.hit_position - Vec3::new(0.0, 0.0, -2.75)).length() < 1e-4);
+        assert_eq!(hit.normal, Vec3::Z);
     }
 
     #[test]

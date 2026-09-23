@@ -49,6 +49,7 @@ mod spatial_query_filters;
 mod spherical_joint_station;
 mod stacking_station;
 mod stations;
+mod wind_experiment;
 
 use axis_locks_station::AxisLocksStationPlugin;
 use camera::CameraFollowPlugin;
@@ -100,6 +101,7 @@ use spatial_query_filters::SpatialQueryFiltersPlugin;
 use spherical_joint_station::SphericalJointStationPlugin;
 use stacking_station::StackingStationPlugin;
 use stations::StationLayoutPlugin;
+use wind_experiment::WindExperimentPlugin;
 
 fn main() {
     App::new()
@@ -121,6 +123,7 @@ fn main() {
             PlayerPlugin,
         ))
         .add_plugins(GameplayMaterialsPlugin)
+        .add_plugins(WindExperimentPlugin)
         .add_plugins((ObjectSpawnPalettePlugin, ResetControlsPlugin))
         .add_plugins(PickingComparisonPlugin)
         .add_plugins(DiagnosticsHudPlugin)

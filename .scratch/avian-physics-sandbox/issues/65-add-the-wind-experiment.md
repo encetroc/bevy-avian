@@ -4,14 +4,14 @@
 
 **Blocked by:** 06, 64
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] Eligible objects receive wind force according to their wind factor.
-- [ ] Wind can be enabled, disabled, and reoriented at runtime.
+- [x] Eligible objects receive wind force according to their wind factor.
+- [x] Wind can be enabled, disabled, and reoriented at runtime.
 
 ## Tests
 
-- [ ] Test paper, wood, ceramic, and stone response.
-- [ ] Disable wind and verify no wind force is applied.
+- [x] Test paper, wood, ceramic, and stone response.
+- [x] Disable wind and verify no wind force is applied.

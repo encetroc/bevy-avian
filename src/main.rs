@@ -31,6 +31,7 @@ mod rigid_body_station;
 mod scene_collider_station;
 mod sensor_zones;
 mod shape_cast_station;
+mod shape_caster_station;
 mod spherical_joint_station;
 mod stacking_station;
 mod stations;
@@ -67,6 +68,7 @@ use rigid_body_station::RigidBodyStationPlugin;
 use scene_collider_station::SceneColliderStationPlugin;
 use sensor_zones::SensorZonesPlugin;
 use shape_cast_station::ShapeCastStationPlugin;
+use shape_caster_station::ShapeCasterStationPlugin;
 use spherical_joint_station::SphericalJointStationPlugin;
 use stacking_station::StackingStationPlugin;
 use stations::StationLayoutPlugin;
@@ -90,7 +92,11 @@ fn main() {
             PlayerPlugin,
             StationLayoutPlugin,
         ))
-        .add_plugins((RayCasterStationPlugin, ShapeCastStationPlugin))
+        .add_plugins((
+            RayCasterStationPlugin,
+            ShapeCastStationPlugin,
+            ShapeCasterStationPlugin,
+        ))
         .add_plugins(SensorZonesPlugin)
         .add_plugins(CollisionEventLogPlugin)
         .add_plugins((CollisionHookDemoPlugin, CollisionLayerDemoPlugin))

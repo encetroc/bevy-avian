@@ -2,8 +2,10 @@ use avian3d::prelude::*;
 use bevy::{ecs::system::SystemParam, prelude::*};
 
 use crate::{
+    breakable_objects::BreakableObject,
     collision_layers::{SandboxLayer, layers_for},
     cursor_hover::CursorRay,
+    gameplay_materials::GameplayMaterial,
     object_inspector::SelectionState,
     player::Player,
     stations::StationObject,
@@ -13,7 +15,7 @@ const PANEL_BACKGROUND: Color = Color::srgba(0.035, 0.05, 0.08, 0.94);
 const PANEL_TEXT: Color = Color::srgb(0.87, 0.92, 0.98);
 const CONTROL_BACKGROUND: Color = Color::srgb(0.12, 0.18, 0.28);
 
-/// The six reusable objects available from the free-sandbox developer palette.
+/// The nine reusable objects available from the free-sandbox developer palette.
 #[derive(Component, Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SpawnPreset {
     Cube,
@@ -22,16 +24,22 @@ pub enum SpawnPreset {
     Barrel,
     HeavyBlock,
     BouncyBall,
+    Ceramic,
+    Wood,
+    Stone,
 }
 
 impl SpawnPreset {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 9] = [
         Self::Cube,
         Self::Ball,
         Self::Plank,
         Self::Barrel,
         Self::HeavyBlock,
         Self::BouncyBall,
+        Self::Ceramic,
+        Self::Wood,
+        Self::Stone,
     ];
 
     pub const fn label(self) -> &'static str {
@@ -42,6 +50,9 @@ impl SpawnPreset {
             Self::Barrel => "Barrel",
             Self::HeavyBlock => "Heavy Block",
             Self::BouncyBall => "Bouncy Ball",
+            Self::Ceramic => "Breakable Ceramic",
+            Self::Wood => "Breakable Wood",
+            Self::Stone => "Breakable Stone",
         }
     }
 
@@ -51,6 +62,8 @@ impl SpawnPreset {
             Self::Ball | Self::BouncyBall => Vec3::splat(0.9),
             Self::Plank => Vec3::new(1.8, 0.35, 0.7),
             Self::Barrel => Vec3::new(0.9, 1.2, 0.9),
+            Self::Ceramic | Self::Stone => Vec3::splat(0.9),
+            Self::Wood => Vec3::new(1.4, 0.55, 0.7),
         }
     }
 
@@ -62,12 +75,18 @@ impl SpawnPreset {
             Self::Barrel => Color::srgb(0.28, 0.72, 0.38),
             Self::HeavyBlock => Color::srgb(0.48, 0.52, 0.6),
             Self::BouncyBall => Color::srgb(0.88, 0.24, 0.78),
+            Self::Ceramic => Color::srgb(0.88, 0.85, 0.78),
+            Self::Wood => Color::srgb(0.55, 0.31, 0.12),
+            Self::Stone => Color::srgb(0.45, 0.48, 0.52),
         }
     }
 
     const fn density(self) -> f32 {
         match self {
             Self::HeavyBlock => 4.0,
+            Self::Ceramic => GameplayMaterial::Ceramic.defaults().density,
+            Self::Wood => GameplayMaterial::Wood.defaults().density,
+            Self::Stone => GameplayMaterial::Stone.defaults().density,
             _ => 0.75,
         }
     }
@@ -75,6 +94,9 @@ impl SpawnPreset {
     const fn restitution(self) -> f32 {
         match self {
             Self::BouncyBall => 0.9,
+            Self::Ceramic => GameplayMaterial::Ceramic.defaults().restitution,
+            Self::Wood => GameplayMaterial::Wood.defaults().restitution,
+            Self::Stone => GameplayMaterial::Stone.defaults().restitution,
             _ => 0.0,
         }
     }
@@ -84,9 +106,12 @@ impl SpawnPreset {
         match self {
             Self::Ball | Self::BouncyBall => Collider::sphere(dimensions.x * 0.5),
             Self::Barrel => Collider::cylinder(dimensions.x * 0.5, dimensions.y),
-            Self::Cube | Self::Plank | Self::HeavyBlock => {
-                Collider::cuboid(dimensions.x, dimensions.y, dimensions.z)
-            }
+            Self::Cube
+            | Self::Plank
+            | Self::HeavyBlock
+            | Self::Ceramic
+            | Self::Wood
+            | Self::Stone => Collider::cuboid(dimensions.x, dimensions.y, dimensions.z),
         }
     }
 
@@ -95,7 +120,12 @@ impl SpawnPreset {
         match self {
             Self::Ball | Self::BouncyBall => Sphere::new(dimensions.x * 0.5).into(),
             Self::Barrel => Cylinder::new(dimensions.x * 0.5, dimensions.y).into(),
-            Self::Cube | Self::Plank | Self::HeavyBlock => Cuboid::from_size(dimensions).into(),
+            Self::Cube
+            | Self::Plank
+            | Self::HeavyBlock
+            | Self::Ceramic
+            | Self::Wood
+            | Self::Stone => Cuboid::from_size(dimensions).into(),
         }
     }
 
@@ -299,7 +329,10 @@ fn spawn_from_controls(
                     2 => KeyCode::Digit3,
                     3 => KeyCode::Digit4,
                     4 => KeyCode::Digit5,
-                    _ => KeyCode::Digit6,
+                    5 => KeyCode::Digit6,
+                    6 => KeyCode::Digit7,
+                    7 => KeyCode::Digit8,
+                    _ => KeyCode::Digit9,
                 };
                 input.keyboard.just_pressed(key).then_some(preset)
             })
@@ -333,6 +366,18 @@ fn spawn_from_controls(
     ));
     if let (Some(mesh), Some(material)) = (mesh, material) {
         entity.insert((Mesh3d(mesh), MeshMaterial3d(material)));
+    }
+    match preset {
+        SpawnPreset::Ceramic => {
+            entity.insert((GameplayMaterial::Ceramic, BreakableObject));
+        }
+        SpawnPreset::Wood => {
+            entity.insert((GameplayMaterial::Wood, BreakableObject));
+        }
+        SpawnPreset::Stone => {
+            entity.insert((GameplayMaterial::Stone, BreakableObject));
+        }
+        _ => {}
     }
 }
 
@@ -394,6 +439,7 @@ mod tests {
             AssetPlugin::default(),
             MeshPlugin,
             PhysicsPlugins::default(),
+            crate::gameplay_materials::GameplayMaterialsPlugin,
             ObjectSpawnPalettePlugin,
         ))
         .init_resource::<CursorRay>()
@@ -497,6 +543,9 @@ mod tests {
                 KeyCode::Digit4,
                 KeyCode::Digit5,
                 KeyCode::Digit6,
+                KeyCode::Digit7,
+                KeyCode::Digit8,
+                KeyCode::Digit9,
             ])
             .enumerate()
         {
@@ -527,6 +576,25 @@ mod tests {
                     .coefficient,
                 preset.restitution()
             );
+            let expected_material = match preset {
+                SpawnPreset::Ceramic => Some(GameplayMaterial::Ceramic),
+                SpawnPreset::Wood => Some(GameplayMaterial::Wood),
+                SpawnPreset::Stone => Some(GameplayMaterial::Stone),
+                _ => None,
+            };
+            assert_eq!(body.get::<GameplayMaterial>().copied(), expected_material);
+            assert_eq!(
+                body.contains::<BreakableObject>(),
+                expected_material.is_some()
+            );
+            if let Some(gameplay_material) = expected_material {
+                assert_eq!(
+                    body.get::<crate::gameplay_materials::BreakThreshold>(),
+                    Some(&crate::gameplay_materials::BreakThreshold(
+                        gameplay_material.defaults().break_threshold
+                    ))
+                );
+            }
             assert!(body.contains::<Mesh3d>());
             assert!(body.contains::<MeshMaterial3d<StandardMaterial>>());
             let transform_position = body.get::<Transform>().unwrap().translation;
@@ -541,7 +609,12 @@ mod tests {
                     assert!(collider.shape().as_ball().is_some())
                 }
                 SpawnPreset::Barrel => assert!(collider.shape().as_cylinder().is_some()),
-                SpawnPreset::Cube | SpawnPreset::Plank | SpawnPreset::HeavyBlock => {
+                SpawnPreset::Cube
+                | SpawnPreset::Plank
+                | SpawnPreset::HeavyBlock
+                | SpawnPreset::Ceramic
+                | SpawnPreset::Wood
+                | SpawnPreset::Stone => {
                     assert!(collider.shape().as_cuboid().is_some())
                 }
             }

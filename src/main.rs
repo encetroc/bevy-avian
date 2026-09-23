@@ -2,6 +2,7 @@ use avian3d::prelude::*;
 use bevy::prelude::*;
 
 mod axis_locks_station;
+mod breakable_objects;
 mod camera;
 mod ccd_launcher;
 mod collider_debug;
@@ -52,6 +53,7 @@ mod stations;
 mod wind_experiment;
 
 use axis_locks_station::AxisLocksStationPlugin;
+use breakable_objects::BreakableObjectsPlugin;
 use camera::CameraFollowPlugin;
 #[cfg(test)]
 use camera::FixedFollowCamera;
@@ -122,7 +124,7 @@ fn main() {
             ObjectGrabbingPlugin,
             PlayerPlugin,
         ))
-        .add_plugins(GameplayMaterialsPlugin)
+        .add_plugins((GameplayMaterialsPlugin, BreakableObjectsPlugin))
         .add_plugins(WindExperimentPlugin)
         .add_plugins((ObjectSpawnPalettePlugin, ResetControlsPlugin))
         .add_plugins(PickingComparisonPlugin)

@@ -4,14 +4,14 @@
 
 **Blocked by:** 36, 64
 
-**Status:** ready-for-agent
+**Status:** complete
 
 ## Acceptance criteria
 
-- [ ] Objects break only when collision impulse exceeds their threshold.
-- [ ] Replacement pieces remain ordinary physical bodies.
+- [x] Objects break only when collision impulse exceeds their threshold.
+- [x] Replacement pieces remain ordinary physical bodies.
 
 ## Tests
 
-- [ ] Apply impacts below and above each threshold.
-- [ ] Verify a broken object cannot break repeatedly from the same event.
+- [x] Verify impacts below and above the ceramic, wood, and stone thresholds.
+- [x] Verify the same object cannot be claimed for breakage twice during one contact event.
